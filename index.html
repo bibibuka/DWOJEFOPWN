@@ -4,11 +4,16 @@
   <meta charset="UTF-8">
   <title>Grist Ultimate Pivot</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.ru.min.js"></script>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-      margin: 0; padding: 0; background-color: white;
+      margin: 0; padding: 0; background-color: white; overflow: hidden;
     }
 
     /* --- ТУЛБАР --- */
@@ -25,7 +30,6 @@
 
     input[type=range] { width: 90px; cursor: pointer; }
     
-    /* Кнопки глобального растягивания */
     .global-drag {
       display: inline-flex; align-items: center; justify-content: center;
       padding: 0 10px; height: 26px;
@@ -33,8 +37,8 @@
       user-select: none; font-size: 12px; font-weight: 600; color: #333;
       box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.1s;
     }
-    #drag-all-cols { cursor: ew-resize; } /* Курсор влево-вправо */
-    #drag-all-rows { cursor: ns-resize; } /* Курсор вверх-вниз */
+    #drag-all-cols { cursor: ew-resize; }
+    #drag-all-rows { cursor: ns-resize; }
     .global-drag:hover { background: #f0f0f0; }
     .global-drag:active { background: #e0f0ea; border-color: #169366; }
     
@@ -42,11 +46,10 @@
       background-color: #169366; color: white; border: none; padding: 6px 15px;
       border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;
     }
-    button#toggle-mode:hover { background-color: #127a55; }
 
     /* --- КОНТЕЙНЕР --- */
     #output {
-      padding: 20px; 
+      padding: 10px; 
       overflow: auto; 
       height: calc(100vh - 48px); 
       width: 100vw;
@@ -58,11 +61,8 @@
       font-size: 13px; 
       border-collapse: collapse; 
       border: 1px solid #ddd;
-      font-family: inherit;
       table-layout: fixed; 
       width: max-content; 
-      min-width: auto;
-      transition: zoom 0.1s ease;
       transform-origin: top left;
     }
 
@@ -71,67 +71,48 @@
       padding: 5px 8px;
       overflow: hidden; 
       text-overflow: ellipsis; 
-      white-space: nowrap;     
+      white-space: nowrap;      
       position: relative;
       box-sizing: border-box; 
-      height: 30px; 
-      min-width: 30px; 
-      max-width: 0; 
+      min-width: 40px; 
     }
     
     .pvtTable th { background-color: #f2f2f2; font-weight: 600; }
 
-    /* --- ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ --- */
-    .resizer-col {
-      position: absolute; top: 0; right: 0; width: 6px; cursor: col-resize; z-index: 20; user-select: none; height: 100%;
-    }
+    /* Ресайзеры */
+    .resizer-col { position: absolute; top: 0; right: 0; width: 6px; cursor: col-resize; z-index: 20; height: 100%; }
     .resizer-col:hover { border-right: 2px solid #169366; }
-
-    .resizer-row {
-      position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; cursor: row-resize; z-index: 20; user-select: none;
-    }
+    .resizer-row { position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; cursor: row-resize; z-index: 20; }
     .resizer-row:hover { border-bottom: 2px solid #169366; }
 
-    /* --- CLEAN MODE --- */
+    /* Режим просмотра (без настроек) */
     .clean-mode .pvtAxisContainer, .clean-mode .pvtRenderer, 
     .clean-mode .pvtAggregator, .clean-mode .pvtAttrDropdown,
     .clean-mode .pvtTriangle, .clean-mode .ui-icon,
-    .clean-mode .pvtTopLeft, 
-    .clean-mode thead tr:first-child > th.pvtAxisContainer,
-    .clean-mode thead tr:first-child > th.pvtTopLeft { 
+    .clean-mode .pvtTopLeft { 
       display: none !important; 
     }
-    .clean-mode table.pvtUi { display: block; padding: 0; margin: 0; }
-    .clean-mode td.pvtRendererArea { padding: 0 !important; border: none !important; }
-    .clean-mode .pvtTable th { cursor: default; background-image: none !important; }
-
   </style>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.ru.min.js"></script>
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
 
 <div id="toolbar">
-  <div class="toolbar-group" id="zoom-controls">
+  <div class="toolbar-group">
     <span>🔍</span>
     <input type="range" id="zoom-slider" min="0.5" max="1.5" step="0.1" value="1">
-    <span id="zoom-val" style="width: 40px;">100%</span>
+    <span id="zoom-val">100%</span>
   </div>
 
   <div class="toolbar-group">
-    <span style="color:#888;">Растянуть всё:</span>
-    <div class="global-drag" id="drag-all-cols" title="Зажмите и тяните вправо/влево">↔ Столбцы</div>
-    <div class="global-drag" id="drag-all-rows" title="Зажмите и тяните вниз/вверх">↕ Строки</div>
+    <span style="color:#888;">Растянуть:</span>
+    <div class="global-drag" id="drag-all-cols">↔ Столбцы</div>
+    <div class="global-drag" id="drag-all-rows">↕ Строки</div>
   </div>
 
   <button id="toggle-mode" onclick="toggleMode()">Настройки</button>
 </div>
 
-<div id="output">Загрузка...</div>
+<div id="output">Загрузка данных...</div>
 
 <script>
   let currentRecords = [];
@@ -139,36 +120,98 @@
   let isViewOnly = false; 
   let currentZoom = 1; 
 
+  // Инициализация Grist
   grist.ready({ requiredAccess: 'full', columns: 'all' });
 
+  // Запрос названий столбцов (красивых имен)
   async function fetchLabels() {
     try {
       const allCols = await grist.docApi.fetchTable('_grist_Tables_column');
-      allCols.forEach(col => { columnLabels[col.colId] = col.label; });
-    } catch (e) { console.warn("Нужен Full Access", e); }
+      if (allCols && Array.isArray(allCols.colId)) {
+        // В Grist API fetchTable возвращает объект со списками, если это системная таблица
+        for(let i=0; i < allCols.colId.length; i++) {
+          columnLabels[allCols.colId[i]] = allCols.label[i];
+        }
+      }
+    } catch (e) {
+      console.warn("Не удалось получить названия столбцов (нужен Full Access):", e);
+    }
   }
 
-  fetchLabels().then(() => { if(currentRecords.length > 0) renderPivot(); });
-
+  // Получение данных
   grist.onRecords(function(records) {
-    if (!records || records.length === 0) { $('#output').text("Нет данных."); return; }
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      $('#output').text("Данные не найдены. Проверьте настройки Data Selection.");
+      return;
+    }
+
     currentRecords = records.map(rec => {
       const cleanRow = {};
-      Object.keys(rec).forEach(key => {
+      const fields = (typeof rec.toJSON === 'function') ? rec.toJSON() : rec;
+      Object.keys(fields).forEach(key => {
         if (key !== 'id' && key !== 'manualSort') {
            const label = columnLabels[key] || key;
-           cleanRow[label] = rec[key];
+           cleanRow[label] = fields[key];
         }
       });
       return cleanRow;
     });
-    renderPivot();
+
+    if (Object.keys(columnLabels).length === 0) {
+      fetchLabels().then(renderPivot);
+    } else {
+      renderPivot();
+    }
   });
 
-  // --- ЛОГИКА ЗУМА ---
+  function renderPivot() {
+    grist.getOption('pivotConfig').then(savedConfig => {
+      const config = savedConfig || {};
+      if (config.isViewOnly !== undefined) isViewOnly = config.isViewOnly;
+      if (config.zoomLevel !== undefined) {
+        currentZoom = config.zoomLevel;
+        $('#zoom-slider').val(currentZoom);
+      }
+      
+      updateViewMode();
+
+      const ruLocales = $.pivotUtilities.locales.ru;
+      
+      $("#output").pivotUI(currentRecords, {
+        renderers: ruLocales.renderers,
+        rendererName: config.rendererName || "Таблица",
+        rows: config.rows || [],
+        cols: config.cols || [],
+        vals: config.vals || [],
+        aggregatorName: config.aggregatorName || "Сумма",
+        onRefresh: function(cfg) {
+          const configToSave = {
+            rows: cfg.rows, cols: cfg.cols, 
+            rendererName: cfg.rendererName,
+            aggregatorName: cfg.aggregatorName, 
+            vals: cfg.vals,
+            isViewOnly: isViewOnly, 
+            zoomLevel: currentZoom 
+          };
+          grist.setOption('pivotConfig', configToSave);
+          
+          // Применяем визуальные правки после рендеринга
+          setTimeout(() => { 
+            initIndividualResizing(); 
+            applyZoom(); 
+          }, 100);
+        }
+      }, true, "ru");
+    });
+  }
+
+  // Управление масштабом
   $('#zoom-slider').on('input', function() {
     currentZoom = parseFloat($(this).val());
     applyZoom();
+  });
+
+  $('#zoom-slider').on('change', function() {
     grist.getOption('pivotConfig').then(config => {
       const newConfig = config || {};
       newConfig.zoomLevel = currentZoom;
@@ -178,7 +221,7 @@
 
   function applyZoom() {
     $('#zoom-val').text(Math.round(currentZoom * 100) + '%');
-    $('.pvtTable').css('zoom', currentZoom);
+    $('.pvtTable').css('transform', `scale(${currentZoom})`);
   }
 
   function toggleMode() {
@@ -193,151 +236,20 @@
 
   function updateViewMode() {
     const btn = document.getElementById('toggle-mode');
-    const container = document.getElementById('output');
     if (isViewOnly) {
-      container.classList.add('clean-mode');
+      $('#output').addClass('clean-mode');
       btn.innerText = "Настройки";
       btn.style.backgroundColor = "#888";
     } else {
-      container.classList.remove('clean-mode');
-      btn.innerText = "Готово (Скрыть)";
+      $('#output').removeClass('clean-mode');
+      btn.innerText = "Готово";
       btn.style.backgroundColor = "#169366";
     }
   }
 
-  function renderPivot() {
-    grist.getOption('pivotConfig').then(config => {
-      const savedConfig = config || {};
-      
-      if (savedConfig.isViewOnly !== undefined) isViewOnly = savedConfig.isViewOnly;
-      if (savedConfig.zoomLevel !== undefined) {
-        currentZoom = savedConfig.zoomLevel;
-        $('#zoom-slider').val(currentZoom);
-      }
-      updateViewMode();
-
-      const ruLocales = $.pivotUtilities.locales.ru;
-      const tpl = $.pivotUtilities.aggregators; 
-      
-      const myAggregators = {
-        "Количество":                tpl["Count"],
-        "Количество уникальных":     tpl["Count Unique Values"],
-        "Кол-во по всему":           tpl["Count as Fraction of Total"],
-        "Кол-во по строке":          tpl["Count as Fraction of Rows"],
-        "Кол-во по столбцу":         tpl["Count as Fraction of Columns"]
-      };
-
-      $("#output").pivotUI(currentRecords, {
-        renderers: ruLocales.renderers,
-        aggregators: myAggregators, 
-        rendererName: savedConfig.rendererName || "Таблица",
-        aggregatorName: savedConfig.aggregatorName || "Количество",
-        rows: savedConfig.rows || [],
-        cols: savedConfig.cols || [],
-        vals: savedConfig.vals || [],
-        inclusions: savedConfig.inclusions,
-        exclusions: savedConfig.exclusions,
-        
-        onRefresh: function(cfg) {
-          const configToSave = {
-            rows: cfg.rows, cols: cfg.cols, rendererName: cfg.rendererName,
-            aggregatorName: cfg.aggregatorName, vals: cfg.vals,
-            inclusions: cfg.inclusions, exclusions: cfg.exclusions,
-            isViewOnly: isViewOnly, zoomLevel: currentZoom 
-          };
-          grist.setOption('pivotConfig', configToSave);
-          
-          setTimeout(() => { 
-            initIndividualResizing(); 
-            applyZoom(); 
-          }, 200);
-        }
-      });
-    });
-  }
-
-  // --- 1. ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ (ИЗ ПАНЕЛИ) ---
-  function setupGlobalResizers() {
-    const dragCols = document.getElementById('drag-all-cols');
-    const dragRows = document.getElementById('drag-all-rows');
-
-    // Растягивание всех столбцов
-    dragCols.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const headers = document.querySelectorAll('.pvtTable th');
-      // Запоминаем изначальную ширину каждой колонки до начала перетаскивания
-      const initialWidths = Array.from(headers).map(th => th.offsetWidth);
-
-      const onMouseMove = (ev) => {
-        // Корректируем смещение мыши с учетом текущего масштаба
-        const dx = (ev.clientX - startX) / currentZoom;
-        headers.forEach((th, idx) => {
-          const newW = Math.max(30, initialWidths[idx] + dx);
-          th.style.width = `${newW}px`;
-          th.style.maxWidth = `${newW}px`;
-          th.style.minWidth = '30px';
-        });
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        document.body.style.cursor = '';
-      };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = 'ew-resize';
-    });
-
-    // Растягивание всех строк
-    dragRows.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      const startY = e.clientY;
-      const rows = document.querySelectorAll('.pvtTable tr');
-      // Запоминаем высоту каждой строки
-      const initialHeights = Array.from(rows).map(tr => tr.offsetHeight);
-
-      const onMouseMove = (ev) => {
-        const dy = (ev.clientY - startY) / currentZoom;
-        rows.forEach((tr, idx) => {
-          const newH = Math.max(20, initialHeights[idx] + dy);
-          tr.style.height = `${newH}px`;
-          Array.from(tr.children).forEach(child => child.style.height = `${newH}px`);
-        });
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        document.body.style.cursor = '';
-      };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = 'ns-resize';
-    });
-  }
-
-  // Инициализируем глобальные кнопки один раз при старте
-  setupGlobalResizers();
-
-
-  // --- 2. ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ (НА ЯЧЕЙКАХ) ---
+  // --- ЛОГИКА РЕСАЙЗА ---
   function initIndividualResizing() {
-    const headers = document.querySelectorAll('.pvtTable th');
-    headers.forEach(th => {
-      th.style.maxWidth = 'none'; 
-      const realWidth = th.getBoundingClientRect().width;
-      const cssWidth = realWidth / currentZoom; // Поправка на масштаб
-      
-      th.style.width = `${cssWidth}px`;
-      th.style.minWidth = '30px'; 
-      th.style.maxWidth = `${cssWidth}px`;
-    });
-
-    const allCells = document.querySelectorAll('.pvtTable th, .pvtTable .pvtRowLabel, .pvtTable .pvtColLabel');
+    const allCells = document.querySelectorAll('.pvtTable th, .pvtTable td');
     allCells.forEach(cell => {
       if (cell.querySelector('.resizer-col')) return;
 
@@ -354,53 +266,77 @@
   }
 
   function setupColResizer(cell, resizer) {
-    let startX = 0; let startW = 0;
-    const onMouseDown = (e) => {
-      e.stopPropagation(); startX = e.clientX; startW = cell.offsetWidth;
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.userSelect = 'none'; document.body.style.cursor = 'col-resize';
-      resizer.style.borderRight = '2px solid #169366';
-    };
-    const onMouseMove = (e) => {
-      const dx = (e.clientX - startX) / currentZoom; 
-      const newW = Math.max(30, startW + dx);
-      cell.style.width = `${newW}px`;
-      cell.style.maxWidth = `${newW}px`; 
-      cell.style.minWidth = '30px';
-    };
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      resizer.style.borderRight = '';
-      document.body.style.userSelect = ''; document.body.style.cursor = '';
-    };
-    resizer.addEventListener('mousedown', onMouseDown);
+    let startX, startW;
+    resizer.addEventListener('mousedown', e => {
+      startX = e.clientX; startW = cell.offsetWidth;
+      const onMove = ev => {
+        const newW = startW + (ev.clientX - startX) / currentZoom;
+        cell.style.width = newW + 'px';
+        cell.style.maxWidth = newW + 'px';
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
 
   function setupRowResizer(cell, resizer) {
-    let startY = 0; let startH = 0; const row = cell.parentElement; 
-    const onMouseDown = (e) => {
-      e.stopPropagation(); startY = e.clientY; startH = row.offsetHeight;
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.userSelect = 'none'; document.body.style.cursor = 'row-resize';
-      resizer.style.borderBottom = '2px solid #169366';
-    };
-    const onMouseMove = (e) => {
-      const dy = (e.clientY - startY) / currentZoom; 
-      const newH = Math.max(20, startH + dy);
-      row.style.height = `${newH}px`;
-      Array.from(row.children).forEach(child => child.style.height = `${newH}px`);
-    };
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      resizer.style.borderBottom = '';
-      document.body.style.userSelect = ''; document.body.style.cursor = '';
-    };
-    resizer.addEventListener('mousedown', onMouseDown);
+    let startY, startH;
+    resizer.addEventListener('mousedown', e => {
+      startY = e.clientY; startH = cell.offsetHeight;
+      const onMove = ev => {
+        const newH = startH + (ev.clientY - startY) / currentZoom;
+        cell.parentElement.style.height = newH + 'px';
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
+
+  // Глобальное растягивание
+  document.getElementById('drag-all-cols').addEventListener('mousedown', e => {
+    let startX = e.clientX;
+    const onMove = ev => {
+      const dx = (ev.clientX - startX) / currentZoom;
+      $('.pvtTable th').each(function() {
+        const newW = $(this).width() + dx;
+        $(this).css({'width': newW, 'max-width': newW});
+      });
+      startX = ev.clientX;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  document.getElementById('drag-all-rows').addEventListener('mousedown', e => {
+    let startY = e.clientY;
+    const onMove = ev => {
+      const dy = (ev.clientY - startY) / currentZoom;
+      $('.pvtTable tr').each(function() {
+        const newH = $(this).height() + dy;
+        $(this).css('height', newH);
+      });
+      startY = ev.clientY;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
 </script>
 
 </body>
