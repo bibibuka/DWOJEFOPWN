@@ -1,30 +1,31 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Grist Ultimate Pivot</title>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.css">
-  
+
   <style>
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       margin: 0; padding: 0; background-color: white;
     }
 
     /* --- ТУЛБАР --- */
     #toolbar {
       padding: 8px 12px; background: #f7f7f7; border-bottom: 1px solid #e0e0e0;
-      display: flex; justify-content: space-between; align-items: center; 
+      display: flex; justify-content: space-between; align-items: center;
       height: 48px; box-sizing: border-box;
       position: sticky; top: 0; z-index: 1000;
     }
-    
+
     .toolbar-group {
       display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555;
     }
 
     input[type=range] { width: 90px; cursor: pointer; }
-    
+
     /* Кнопки глобального растягивания */
     .global-drag {
       display: inline-flex; align-items: center; justify-content: center;
@@ -33,11 +34,11 @@
       user-select: none; font-size: 12px; font-weight: 600; color: #333;
       box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.1s;
     }
-    #drag-all-cols { cursor: ew-resize; } /* Курсор влево-вправо */
-    #drag-all-rows { cursor: ns-resize; } /* Курсор вверх-вниз */
+    #drag-all-cols { cursor: ew-resize; }
+    #drag-all-rows { cursor: ns-resize; }
     .global-drag:hover { background: #f0f0f0; }
     .global-drag:active { background: #e0f0ea; border-color: #169366; }
-    
+
     button#toggle-mode {
       background-color: #169366; color: white; border: none; padding: 6px 15px;
       border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;
@@ -46,39 +47,39 @@
 
     /* --- КОНТЕЙНЕР --- */
     #output {
-      padding: 20px; 
-      overflow: auto; 
-      height: calc(100vh - 48px); 
+      padding: 20px;
+      overflow: auto;
+      height: calc(100vh - 48px);
       width: 100vw;
       box-sizing: border-box;
     }
 
     /* --- ТАБЛИЦА --- */
-    .pvtTable { 
-      font-size: 13px; 
-      border-collapse: collapse; 
+    .pvtTable {
+      font-size: 13px;
+      border-collapse: collapse;
       border: 1px solid #ddd;
       font-family: inherit;
-      table-layout: fixed; 
-      width: max-content; 
+      table-layout: fixed;
+      width: max-content;
       min-width: auto;
       transition: zoom 0.1s ease;
       transform-origin: top left;
     }
 
     .pvtTable th, .pvtTable td {
-      border: 1px solid #ccc; 
+      border: 1px solid #ccc;
       padding: 5px 8px;
-      overflow: hidden; 
-      text-overflow: ellipsis; 
-      white-space: nowrap;     
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       position: relative;
-      box-sizing: border-box; 
-      height: 30px; 
-      min-width: 30px; 
-      max-width: 0; 
+      box-sizing: border-box;
+      height: 30px;
+      min-width: 30px;
+      max-width: 0;
     }
-    
+
     .pvtTable th { background-color: #f2f2f2; font-weight: 600; }
 
     /* --- ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ --- */
@@ -93,18 +94,17 @@
     .resizer-row:hover { border-bottom: 2px solid #169366; }
 
     /* --- CLEAN MODE --- */
-    .clean-mode .pvtAxisContainer, .clean-mode .pvtRenderer, 
+    .clean-mode .pvtAxisContainer, .clean-mode .pvtRenderer,
     .clean-mode .pvtAggregator, .clean-mode .pvtAttrDropdown,
     .clean-mode .pvtTriangle, .clean-mode .ui-icon,
-    .clean-mode .pvtTopLeft, 
+    .clean-mode .pvtTopLeft,
     .clean-mode thead tr:first-child > th.pvtAxisContainer,
-    .clean-mode thead tr:first-child > th.pvtTopLeft { 
-      display: none !important; 
+    .clean-mode thead tr:first-child > th.pvtTopLeft {
+      display: none !important;
     }
     .clean-mode table.pvtUi { display: block; padding: 0; margin: 0; }
     .clean-mode td.pvtRendererArea { padding: 0 !important; border: none !important; }
     .clean-mode .pvtTable th { cursor: default; background-image: none !important; }
-
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -113,295 +113,462 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.ru.min.js"></script>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
+
 <body>
+  <div id="toolbar">
+    <div class="toolbar-group" id="zoom-controls">
+      <span>🔍</span>
+      <input type="range" id="zoom-slider" min="0.5" max="1.5" step="0.1" value="1">
+      <span id="zoom-val" style="width: 40px;">100%</span>
+    </div>
 
-<div id="toolbar">
-  <div class="toolbar-group" id="zoom-controls">
-    <span>🔍</span>
-    <input type="range" id="zoom-slider" min="0.5" max="1.5" step="0.1" value="1">
-    <span id="zoom-val" style="width: 40px;">100%</span>
+    <div class="toolbar-group">
+      <span style="color:#888;">Растянуть всё:</span>
+      <div class="global-drag" id="drag-all-cols" title="Зажмите и тяните вправо/влево">↔ Столбцы</div>
+      <div class="global-drag" id="drag-all-rows" title="Зажмите и тяните вниз/вверх">↕ Строки</div>
+    </div>
+
+    <button id="toggle-mode" onclick="toggleMode()">Настройки</button>
   </div>
 
-  <div class="toolbar-group">
-    <span style="color:#888;">Растянуть всё:</span>
-    <div class="global-drag" id="drag-all-cols" title="Зажмите и тяните вправо/влево">↔ Столбцы</div>
-    <div class="global-drag" id="drag-all-rows" title="Зажмите и тяните вниз/вверх">↕ Строки</div>
-  </div>
+  <div id="output">Загрузка...</div>
 
-  <button id="toggle-mode" onclick="toggleMode()">Настройки</button>
-</div>
+  <script>
+    // -----------------------------
+    // ГЛОБАЛЬНОЕ СОСТОЯНИЕ
+    // -----------------------------
+    let rawRecords = [];            // как пришло из grist.onRecords
+    let columnLabels = {};          // colId -> label (ТОЛЬКО для текущей таблицы)
+    let currentTableId = null;
 
-<div id="output">Загрузка...</div>
+    let isViewOnly = false;
+    let currentZoom = 1;
 
-<script>
-  let currentRecords = [];
-  let columnLabels = {}; 
-  let isViewOnly = false; 
-  let currentZoom = 1; 
+    let renderInProgress = false;
+    let renderPending = false;
 
-  grist.ready({ requiredAccess: 'full', columns: 'all' });
+    // Важно: чтобы читать _grist_Tables и _grist_Tables_column нужен full
+    grist.ready({ requiredAccess: 'full', columns: 'all' });
 
-  async function fetchLabels() {
-    try {
-      const allCols = await grist.docApi.fetchTable('_grist_Tables_column');
-      allCols.forEach(col => { columnLabels[col.colId] = col.label; });
-    } catch (e) { console.warn("Нужен Full Access", e); }
-  }
-
-  fetchLabels().then(() => { if(currentRecords.length > 0) renderPivot(); });
-
-  grist.onRecords(function(records) {
-    if (!records || records.length === 0) { $('#output').text("Нет данных."); return; }
-    currentRecords = records.map(rec => {
-      const cleanRow = {};
-      Object.keys(rec).forEach(key => {
-        if (key !== 'id' && key !== 'manualSort') {
-           const label = columnLabels[key] || key;
-           cleanRow[label] = rec[key];
-        }
-      });
-      return cleanRow;
-    });
-    renderPivot();
-  });
-
-  // --- ЛОГИКА ЗУМА ---
-  $('#zoom-slider').on('input', function() {
-    currentZoom = parseFloat($(this).val());
-    applyZoom();
-    grist.getOption('pivotConfig').then(config => {
-      const newConfig = config || {};
-      newConfig.zoomLevel = currentZoom;
-      grist.setOption('pivotConfig', newConfig);
-    });
-  });
-
-  function applyZoom() {
-    $('#zoom-val').text(Math.round(currentZoom * 100) + '%');
-    $('.pvtTable').css('zoom', currentZoom);
-  }
-
-  function toggleMode() {
-    isViewOnly = !isViewOnly;
-    updateViewMode();
-    grist.getOption('pivotConfig').then(config => {
-      const newConfig = config || {};
-      newConfig.isViewOnly = isViewOnly;
-      grist.setOption('pivotConfig', newConfig);
-    });
-  }
-
-  function updateViewMode() {
-    const btn = document.getElementById('toggle-mode');
-    const container = document.getElementById('output');
-    if (isViewOnly) {
-      container.classList.add('clean-mode');
-      btn.innerText = "Настройки";
-      btn.style.backgroundColor = "#888";
-    } else {
-      container.classList.remove('clean-mode');
-      btn.innerText = "Готово (Скрыть)";
-      btn.style.backgroundColor = "#169366";
-    }
-  }
-
-  function renderPivot() {
-    grist.getOption('pivotConfig').then(config => {
-      const savedConfig = config || {};
-      
-      if (savedConfig.isViewOnly !== undefined) isViewOnly = savedConfig.isViewOnly;
-      if (savedConfig.zoomLevel !== undefined) {
-        currentZoom = savedConfig.zoomLevel;
-        $('#zoom-slider').val(currentZoom);
+    // -----------------------------
+    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+    // -----------------------------
+    async function getTableIdSafe() {
+      try {
+        return await grist.getTable().getTableId();
+      } catch (e) {
+        console.warn("Не удалось получить tableId", e);
+        return null;
       }
+    }
+
+    async function getConfigKeyForCurrentTable() {
+      const tableId = await getTableIdSafe();
+      return tableId ? `pivotConfig:${tableId}` : `pivotConfig`;
+    }
+
+    function sanitizeConfig(savedConfig, fields) {
+      const cleanArr = (a) => (Array.isArray(a) ? a.filter(x => fields.includes(x)) : []);
+      // inclusions/exclusions в pivot.js — объекты, их трогать не будем
+      return {
+        ...savedConfig,
+        rows: cleanArr(savedConfig.rows),
+        cols: cleanArr(savedConfig.cols),
+        vals: cleanArr(savedConfig.vals),
+      };
+    }
+
+    function mapRecordsWithLabels(records) {
+      return (records || []).map(rec => {
+        const cleanRow = {};
+        Object.keys(rec).forEach(key => {
+          if (key === 'id' || key === 'manualSort') return;
+          const label = columnLabels[key] || key;
+          cleanRow[label] = rec[key];
+        });
+        return cleanRow;
+      });
+    }
+
+    // -----------------------------
+    // МЕТАДАННЫЕ: labels для текущей таблицы
+    // (ВАЖНО: fetchTable возвращает "объект массивов", а не массив строк)
+    // -----------------------------
+    async function loadColumnLabelsForCurrentTable() {
+      columnLabels = {};
+
+      try {
+        const tableId = await getTableIdSafe();
+        if (!tableId) return;
+
+        // 1) найдём tableRef (id) в _grist_Tables по tableId
+        const tables = await grist.docApi.fetchTable('_grist_Tables');
+        const nT = (tables.tableId || []).length;
+
+        let tableRef = null;
+        for (let i = 0; i < nT; i++) {
+          if (tables.tableId[i] === tableId) {
+            tableRef = tables.id[i];
+            break;
+          }
+        }
+        if (!tableRef) return;
+
+        // 2) загрузим _grist_Tables_column и отфильтруем по parentId == tableRef
+        const cols = await grist.docApi.fetchTable('_grist_Tables_column');
+        const nC = (cols.colId || []).length;
+
+        for (let i = 0; i < nC; i++) {
+          const parentId = cols.parentId?.[i];
+          if (parentId !== tableRef) continue;
+
+          const colId = cols.colId[i];
+          const label = cols.label?.[i] || colId;
+          if (colId) columnLabels[colId] = label;
+        }
+      } catch (e) {
+        // Если нет full-доступа/поломались метаданные — просто работаем с colId
+        console.warn("Не удалось загрузить labels колонок (будут colId)", e);
+      }
+    }
+
+    async function ensureTableContextUpToDate() {
+      const tableId = await getTableIdSafe();
+      if (!tableId) return;
+
+      if (currentTableId !== tableId) {
+        currentTableId = tableId;
+        await loadColumnLabelsForCurrentTable();
+      }
+    }
+
+    function scheduleRender() {
+      if (renderInProgress) {
+        renderPending = true;
+        return;
+      }
+      renderPivot();
+    }
+
+    // -----------------------------
+    // ЗУМ
+    // -----------------------------
+    $('#zoom-slider').on('input', async function () {
+      currentZoom = parseFloat($(this).val());
+      applyZoom();
+
+      const key = await getConfigKeyForCurrentTable();
+      const config = (await grist.getOption(key)) || {};
+      config.zoomLevel = currentZoom;
+      await grist.setOption(key, config);
+    });
+
+    function applyZoom() {
+      $('#zoom-val').text(Math.round(currentZoom * 100) + '%');
+      $('.pvtTable').css('zoom', currentZoom);
+    }
+
+    // -----------------------------
+    // РЕЖИМ "НАСТРОЙКИ/ЧИСТО"
+    // -----------------------------
+    async function toggleMode() {
+      isViewOnly = !isViewOnly;
       updateViewMode();
 
-      const ruLocales = $.pivotUtilities.locales.ru;
-      const tpl = $.pivotUtilities.aggregators; 
-      
-      const myAggregators = {
-        "Количество":                tpl["Count"],
-        "Количество уникальных":     tpl["Count Unique Values"],
-        "Кол-во по всему":           tpl["Count as Fraction of Total"],
-        "Кол-во по строке":          tpl["Count as Fraction of Rows"],
-        "Кол-во по столбцу":         tpl["Count as Fraction of Columns"]
-      };
+      const key = await getConfigKeyForCurrentTable();
+      const config = (await grist.getOption(key)) || {};
+      config.isViewOnly = isViewOnly;
+      await grist.setOption(key, config);
+    }
 
-      $("#output").pivotUI(currentRecords, {
-        renderers: ruLocales.renderers,
-        aggregators: myAggregators, 
-        rendererName: savedConfig.rendererName || "Таблица",
-        aggregatorName: savedConfig.aggregatorName || "Количество",
-        rows: savedConfig.rows || [],
-        cols: savedConfig.cols || [],
-        vals: savedConfig.vals || [],
-        inclusions: savedConfig.inclusions,
-        exclusions: savedConfig.exclusions,
-        
-        onRefresh: function(cfg) {
-          const configToSave = {
-            rows: cfg.rows, cols: cfg.cols, rendererName: cfg.rendererName,
-            aggregatorName: cfg.aggregatorName, vals: cfg.vals,
-            inclusions: cfg.inclusions, exclusions: cfg.exclusions,
-            isViewOnly: isViewOnly, zoomLevel: currentZoom 
-          };
-          grist.setOption('pivotConfig', configToSave);
-          
-          setTimeout(() => { 
-            initIndividualResizing(); 
-            applyZoom(); 
-          }, 200);
+    function updateViewMode() {
+      const btn = document.getElementById('toggle-mode');
+      const container = document.getElementById('output');
+
+      if (isViewOnly) {
+        container.classList.add('clean-mode');
+        btn.innerText = "Настройки";
+        btn.style.backgroundColor = "#888";
+      } else {
+        container.classList.remove('clean-mode');
+        btn.innerText = "Готово (Скрыть)";
+        btn.style.backgroundColor = "#169366";
+      }
+    }
+
+    // -----------------------------
+    // ОСНОВНОЙ РЕНДЕР PIVOT
+    // -----------------------------
+    async function renderPivot() {
+      renderInProgress = true;
+
+      try {
+        await ensureTableContextUpToDate();
+
+        if (!rawRecords || rawRecords.length === 0) {
+          $('#output').text("Нет данных.");
+          return;
         }
+
+        const currentRecords = mapRecordsWithLabels(rawRecords);
+        const fields = currentRecords.length ? Object.keys(currentRecords[0]) : [];
+
+        const key = await getConfigKeyForCurrentTable();
+        const savedConfig = (await grist.getOption(key)) || {};
+
+        if (savedConfig.isViewOnly !== undefined) isViewOnly = savedConfig.isViewOnly;
+        if (savedConfig.zoomLevel !== undefined) {
+          currentZoom = savedConfig.zoomLevel;
+          $('#zoom-slider').val(currentZoom);
+        }
+        updateViewMode();
+
+        const ruLocales = $.pivotUtilities.locales.ru;
+        const tpl = $.pivotUtilities.aggregators;
+
+        const myAggregators = {
+          "Количество":            tpl["Count"],
+          "Количество уникальных": tpl["Count Unique Values"],
+          "Кол-во по всему":       tpl["Count as Fraction of Total"],
+          "Кол-во по строке":      tpl["Count as Fraction of Rows"],
+          "Кол-во по столбцу":     tpl["Count as Fraction of Columns"]
+        };
+
+        const safeConfig = sanitizeConfig(savedConfig, fields);
+
+        const options = {
+          renderers: ruLocales.renderers,
+          aggregators: myAggregators,
+
+          rendererName: safeConfig.rendererName || "Таблица",
+          aggregatorName: safeConfig.aggregatorName || "Количество",
+
+          rows: safeConfig.rows || [],
+          cols: safeConfig.cols || [],
+          vals: safeConfig.vals || [],
+
+          inclusions: safeConfig.inclusions,
+          exclusions: safeConfig.exclusions,
+
+          onRefresh: function (cfg) {
+            // cfg от pivotUI иногда содержит служебные поля — сохраняем только нужное
+            const configToSave = {
+              rows: cfg.rows,
+              cols: cfg.cols,
+              vals: cfg.vals,
+              rendererName: cfg.rendererName,
+              aggregatorName: cfg.aggregatorName,
+              inclusions: cfg.inclusions,
+              exclusions: cfg.exclusions,
+              isViewOnly: isViewOnly,
+              zoomLevel: currentZoom
+            };
+
+            // ключ именно текущей таблицы
+            grist.setOption(key, configToSave);
+
+            setTimeout(() => {
+              initIndividualResizing();
+              applyZoom();
+            }, 200);
+          }
+        };
+
+        // КЛЮЧЕВОЕ: overwrite=true, чтобы при смене таблицы не тащить старый UI/DOM
+        $("#output").empty().pivotUI(currentRecords, options, true);
+
+        // после первичного рендера
+        setTimeout(() => {
+          initIndividualResizing();
+          applyZoom();
+        }, 200);
+
+      } catch (e) {
+        console.error(e);
+        $('#output').text("Ошибка рендера: " + (e?.message || e));
+      } finally {
+        renderInProgress = false;
+        if (renderPending) {
+          renderPending = false;
+          scheduleRender();
+        }
+      }
+    }
+
+    // -----------------------------
+    // GRIST: получаем записи
+    // -----------------------------
+    grist.onRecords(function (records) {
+      rawRecords = records || [];
+      scheduleRender();
+    });
+
+    // -----------------------------
+    // 1) ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ
+    // -----------------------------
+    function setupGlobalResizers() {
+      const dragCols = document.getElementById('drag-all-cols');
+      const dragRows = document.getElementById('drag-all-rows');
+
+      dragCols.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+
+        const startX = e.clientX;
+        const headers = document.querySelectorAll('.pvtTable th');
+
+        // запоминаем ширину в "незумированных" px
+        const initialWidths = Array.from(headers).map(th => th.getBoundingClientRect().width / currentZoom);
+
+        const onMouseMove = (ev) => {
+          const dx = (ev.clientX - startX) / currentZoom;
+          headers.forEach((th, idx) => {
+            const newW = Math.max(30, initialWidths[idx] + dx);
+            th.style.width = `${newW}px`;
+            th.style.maxWidth = `${newW}px`;
+            th.style.minWidth = '30px';
+          });
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          document.body.style.cursor = '';
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'ew-resize';
       });
-    });
-  }
 
-  // --- 1. ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ (ИЗ ПАНЕЛИ) ---
-  function setupGlobalResizers() {
-    const dragCols = document.getElementById('drag-all-cols');
-    const dragRows = document.getElementById('drag-all-rows');
+      dragRows.addEventListener('mousedown', (e) => {
+        e.preventDefault();
 
-    // Растягивание всех столбцов
-    dragCols.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      const startX = e.clientX;
+        const startY = e.clientY;
+        const rows = document.querySelectorAll('.pvtTable tr');
+        const initialHeights = Array.from(rows).map(tr => tr.getBoundingClientRect().height / currentZoom);
+
+        const onMouseMove = (ev) => {
+          const dy = (ev.clientY - startY) / currentZoom;
+          rows.forEach((tr, idx) => {
+            const newH = Math.max(20, initialHeights[idx] + dy);
+            tr.style.height = `${newH}px`;
+            Array.from(tr.children).forEach(child => child.style.height = `${newH}px`);
+          });
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          document.body.style.cursor = '';
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'ns-resize';
+      });
+    }
+    setupGlobalResizers();
+
+    // -----------------------------
+    // 2) ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ
+    // -----------------------------
+    function initIndividualResizing() {
       const headers = document.querySelectorAll('.pvtTable th');
-      // Запоминаем изначальную ширину каждой колонки до начала перетаскивания
-      const initialWidths = Array.from(headers).map(th => th.offsetWidth);
+      headers.forEach(th => {
+        th.style.maxWidth = 'none';
+        const realWidth = th.getBoundingClientRect().width;
+        const cssWidth = realWidth / currentZoom;
 
-      const onMouseMove = (ev) => {
-        // Корректируем смещение мыши с учетом текущего масштаба
-        const dx = (ev.clientX - startX) / currentZoom;
-        headers.forEach((th, idx) => {
-          const newW = Math.max(30, initialWidths[idx] + dx);
-          th.style.width = `${newW}px`;
-          th.style.maxWidth = `${newW}px`;
-          th.style.minWidth = '30px';
-        });
+        th.style.width = `${cssWidth}px`;
+        th.style.minWidth = '30px';
+        th.style.maxWidth = `${cssWidth}px`;
+      });
+
+      const allCells = document.querySelectorAll('.pvtTable th, .pvtTable .pvtRowLabel, .pvtTable .pvtColLabel');
+      allCells.forEach(cell => {
+        if (cell.querySelector('.resizer-col')) return;
+
+        const colResizer = document.createElement('div');
+        colResizer.classList.add('resizer-col');
+        cell.appendChild(colResizer);
+        setupColResizer(cell, colResizer);
+
+        const rowResizer = document.createElement('div');
+        rowResizer.classList.add('resizer-row');
+        cell.appendChild(rowResizer);
+        setupRowResizer(cell, rowResizer);
+      });
+    }
+
+    function setupColResizer(cell, resizer) {
+      let startX = 0;
+      let startW = 0;
+
+      const onMouseDown = (e) => {
+        e.stopPropagation();
+        startX = e.clientX;
+        startW = cell.getBoundingClientRect().width / currentZoom;
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+        resizer.style.borderRight = '2px solid #169366';
+      };
+
+      const onMouseMove = (e) => {
+        const dx = (e.clientX - startX) / currentZoom;
+        const newW = Math.max(30, startW + dx);
+        cell.style.width = `${newW}px`;
+        cell.style.maxWidth = `${newW}px`;
+        cell.style.minWidth = '30px';
       };
 
       const onMouseUp = () => {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+        resizer.style.borderRight = '';
+        document.body.style.userSelect = '';
         document.body.style.cursor = '';
       };
 
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = 'ew-resize';
-    });
+      resizer.addEventListener('mousedown', onMouseDown);
+    }
 
-    // Растягивание всех строк
-    dragRows.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      const startY = e.clientY;
-      const rows = document.querySelectorAll('.pvtTable tr');
-      // Запоминаем высоту каждой строки
-      const initialHeights = Array.from(rows).map(tr => tr.offsetHeight);
+    function setupRowResizer(cell, resizer) {
+      let startY = 0;
+      let startH = 0;
+      const row = cell.parentElement;
 
-      const onMouseMove = (ev) => {
-        const dy = (ev.clientY - startY) / currentZoom;
-        rows.forEach((tr, idx) => {
-          const newH = Math.max(20, initialHeights[idx] + dy);
-          tr.style.height = `${newH}px`;
-          Array.from(tr.children).forEach(child => child.style.height = `${newH}px`);
-        });
+      const onMouseDown = (e) => {
+        e.stopPropagation();
+        startY = e.clientY;
+        startH = row.getBoundingClientRect().height / currentZoom;
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'row-resize';
+        resizer.style.borderBottom = '2px solid #169366';
+      };
+
+      const onMouseMove = (e) => {
+        const dy = (e.clientY - startY) / currentZoom;
+        const newH = Math.max(20, startH + dy);
+        row.style.height = `${newH}px`;
+        Array.from(row.children).forEach(child => child.style.height = `${newH}px`);
       };
 
       const onMouseUp = () => {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+        resizer.style.borderBottom = '';
+        document.body.style.userSelect = '';
         document.body.style.cursor = '';
       };
 
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = 'ns-resize';
-    });
-  }
-
-  // Инициализируем глобальные кнопки один раз при старте
-  setupGlobalResizers();
-
-
-  // --- 2. ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ (НА ЯЧЕЙКАХ) ---
-  function initIndividualResizing() {
-    const headers = document.querySelectorAll('.pvtTable th');
-    headers.forEach(th => {
-      th.style.maxWidth = 'none'; 
-      const realWidth = th.getBoundingClientRect().width;
-      const cssWidth = realWidth / currentZoom; // Поправка на масштаб
-      
-      th.style.width = `${cssWidth}px`;
-      th.style.minWidth = '30px'; 
-      th.style.maxWidth = `${cssWidth}px`;
-    });
-
-    const allCells = document.querySelectorAll('.pvtTable th, .pvtTable .pvtRowLabel, .pvtTable .pvtColLabel');
-    allCells.forEach(cell => {
-      if (cell.querySelector('.resizer-col')) return;
-
-      const colResizer = document.createElement('div');
-      colResizer.classList.add('resizer-col');
-      cell.appendChild(colResizer);
-      setupColResizer(cell, colResizer);
-
-      const rowResizer = document.createElement('div');
-      rowResizer.classList.add('resizer-row');
-      cell.appendChild(rowResizer);
-      setupRowResizer(cell, rowResizer);
-    });
-  }
-
-  function setupColResizer(cell, resizer) {
-    let startX = 0; let startW = 0;
-    const onMouseDown = (e) => {
-      e.stopPropagation(); startX = e.clientX; startW = cell.offsetWidth;
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.userSelect = 'none'; document.body.style.cursor = 'col-resize';
-      resizer.style.borderRight = '2px solid #169366';
-    };
-    const onMouseMove = (e) => {
-      const dx = (e.clientX - startX) / currentZoom; 
-      const newW = Math.max(30, startW + dx);
-      cell.style.width = `${newW}px`;
-      cell.style.maxWidth = `${newW}px`; 
-      cell.style.minWidth = '30px';
-    };
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      resizer.style.borderRight = '';
-      document.body.style.userSelect = ''; document.body.style.cursor = '';
-    };
-    resizer.addEventListener('mousedown', onMouseDown);
-  }
-
-  function setupRowResizer(cell, resizer) {
-    let startY = 0; let startH = 0; const row = cell.parentElement; 
-    const onMouseDown = (e) => {
-      e.stopPropagation(); startY = e.clientY; startH = row.offsetHeight;
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-      document.body.style.userSelect = 'none'; document.body.style.cursor = 'row-resize';
-      resizer.style.borderBottom = '2px solid #169366';
-    };
-    const onMouseMove = (e) => {
-      const dy = (e.clientY - startY) / currentZoom; 
-      const newH = Math.max(20, startH + dy);
-      row.style.height = `${newH}px`;
-      Array.from(row.children).forEach(child => child.style.height = `${newH}px`);
-    };
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      resizer.style.borderBottom = '';
-      document.body.style.userSelect = ''; document.body.style.cursor = '';
-    };
-    resizer.addEventListener('mousedown', onMouseDown);
-  }
-</script>
-
+      resizer.addEventListener('mousedown', onMouseDown);
+    }
+  </script>
 </body>
 </html>
