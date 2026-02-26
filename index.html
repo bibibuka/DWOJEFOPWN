@@ -63,7 +63,6 @@
       table-layout: fixed;
       width: max-content;
       min-width: auto;
-      transition: zoom 0.1s ease;
       transform-origin: top left;
     }
 
@@ -105,6 +104,16 @@
     .clean-mode table.pvtUi { display: block; padding: 0; margin: 0; }
     .clean-mode td.pvtRendererArea { padding: 0 !important; border: none !important; }
     .clean-mode .pvtTable th { cursor: default; background-image: none !important; }
+
+    /* FIX: список полей горизонтально (если Grist/тема перебивает pivot.css) */
+    #output .pvtHorizList li {
+      display: inline-block !important;  /* было "как раньше": плитками в строку */
+      float: none !important;
+    }
+    #output .pvtAxisContainer ul.pvtAttrList {
+      padding-left: 0 !important;
+      margin: 0 !important;
+    }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -135,10 +144,10 @@
 
   <script>
     // -----------------------------
-    // ГЛОБАЛЬНОЕ СОСТОЯНИЕ
+    // СОСТОЯНИЕ
     // -----------------------------
-    let rawRecords = [];            // как пришло из grist.onRecords
-    let columnLabels = {};          // colId -> label (ТОЛЬКО для текущей таблицы)
+    let rawRecords = [];
+    let columnLabels = {};     // colId -> label для текущей таблицы
     let currentTableId = null;
 
     let isViewOnly = false;
@@ -147,11 +156,14 @@
     let renderInProgress = false;
     let renderPending = false;
 
-    // Важно: чтобы читать _grist_Tables и _grist_Tables_column нужен full
-    grist.ready({ requiredAccess: 'full', columns: 'all' });
+    let reloadInFlight = false;
+    let lastDataStamp = 0;
+
+    // Важно: НЕ указываем columns: 'all' (это не про "все колонки")
+    grist.ready({ requiredAccess: 'full' });
 
     // -----------------------------
-    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+    // HELPERS
     // -----------------------------
     async function getTableIdSafe() {
       try {
@@ -169,7 +181,6 @@
 
     function sanitizeConfig(savedConfig, fields) {
       const cleanArr = (a) => (Array.isArray(a) ? a.filter(x => fields.includes(x)) : []);
-      // inclusions/exclusions в pivot.js — объекты, их трогать не будем
       return {
         ...savedConfig,
         rows: cleanArr(savedConfig.rows),
@@ -190,19 +201,13 @@
       });
     }
 
-    // -----------------------------
-    // МЕТАДАННЫЕ: labels для текущей таблицы
-    // (ВАЖНО: fetchTable возвращает "объект массивов", а не массив строк)
-    // -----------------------------
     async function loadColumnLabelsForCurrentTable() {
       columnLabels = {};
-
       try {
         const tableId = await getTableIdSafe();
         if (!tableId) return;
 
-        // 1) найдём tableRef (id) в _grist_Tables по tableId
-        const tables = await grist.docApi.fetchTable('_grist_Tables');
+        const tables = await grist.docApi.fetchTable('_grist_Tables'); // columns-oriented
         const nT = (tables.tableId || []).length;
 
         let tableRef = null;
@@ -214,21 +219,17 @@
         }
         if (!tableRef) return;
 
-        // 2) загрузим _grist_Tables_column и отфильтруем по parentId == tableRef
-        const cols = await grist.docApi.fetchTable('_grist_Tables_column');
+        const cols = await grist.docApi.fetchTable('_grist_Tables_column'); // columns-oriented
         const nC = (cols.colId || []).length;
 
         for (let i = 0; i < nC; i++) {
-          const parentId = cols.parentId?.[i];
-          if (parentId !== tableRef) continue;
-
+          if (cols.parentId?.[i] !== tableRef) continue;
           const colId = cols.colId[i];
           const label = cols.label?.[i] || colId;
           if (colId) columnLabels[colId] = label;
         }
       } catch (e) {
-        // Если нет full-доступа/поломались метаданные — просто работаем с colId
-        console.warn("Не удалось загрузить labels колонок (будут colId)", e);
+        console.warn("Не удалось загрузить labels (будут colId)", e);
       }
     }
 
@@ -243,12 +244,42 @@
     }
 
     function scheduleRender() {
-      if (renderInProgress) {
-        renderPending = true;
-        return;
-      }
+      if (renderInProgress) { renderPending = true; return; }
       renderPivot();
     }
+
+    // -----------------------------
+    // FORCE RELOAD (чтобы не нужно было жать Restart при переходах)
+    // -----------------------------
+    async function forceReloadFromGrist(reason = "") {
+      if (reloadInFlight) return;
+      reloadInFlight = true;
+
+      try {
+        // Важно: includeColumns:'normal' -> все обычные колонки (нужен full access)
+        const rows = await grist.fetchSelectedTable({ format: "rows", includeColumns: "normal" });
+        rawRecords = rows || [];
+        lastDataStamp = Date.now();
+        scheduleRender();
+      } catch (e) {
+        console.warn("forceReloadFromGrist failed", reason, e);
+      } finally {
+        reloadInFlight = false;
+      }
+    }
+
+    // 1) сразу при старте
+    setTimeout(() => forceReloadFromGrist("startup"), 0);
+
+    // 2) когда вкладка/виджет снова стал видимым (часто при переходе на другую страницу Grist)
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) setTimeout(() => forceReloadFromGrist("visibilitychange"), 50);
+    });
+
+    // 3) иногда полезно при возврате фокуса
+    window.addEventListener("focus", () => {
+      setTimeout(() => forceReloadFromGrist("focus"), 50);
+    });
 
     // -----------------------------
     // ЗУМ
@@ -297,7 +328,7 @@
     }
 
     // -----------------------------
-    // ОСНОВНОЙ РЕНДЕР PIVOT
+    // РЕНДЕР PIVOT
     // -----------------------------
     async function renderPivot() {
       renderInProgress = true;
@@ -349,10 +380,11 @@
 
           inclusions: safeConfig.inclusions,
           exclusions: safeConfig.exclusions,
+
+          // фиксируем горизонтальный список полей
           unusedAttrsVertical: false,
 
           onRefresh: function (cfg) {
-            // cfg от pivotUI иногда содержит служебные поля — сохраняем только нужное
             const configToSave = {
               rows: cfg.rows,
               cols: cfg.cols,
@@ -365,7 +397,6 @@
               zoomLevel: currentZoom
             };
 
-            // ключ именно текущей таблицы
             grist.setOption(key, configToSave);
 
             setTimeout(() => {
@@ -375,10 +406,9 @@
           }
         };
 
-        // КЛЮЧЕВОЕ: overwrite=true, чтобы при смене таблицы не тащить старый UI/DOM
+        // overwrite=true — чтобы при смене таблицы/страницы старый UI не мешал
         $("#output").empty().pivotUI(currentRecords, options, true);
 
-        // после первичного рендера
         setTimeout(() => {
           initIndividualResizing();
           applyZoom();
@@ -389,20 +419,25 @@
         $('#output').text("Ошибка рендера: " + (e?.message || e));
       } finally {
         renderInProgress = false;
-        if (renderPending) {
-          renderPending = false;
-          scheduleRender();
-        }
+        if (renderPending) { renderPending = false; scheduleRender(); }
       }
     }
 
     // -----------------------------
-    // GRIST: получаем записи
+    // GRIST: подписка на записи
+    // (Важно: includeColumns:'normal' чтобы при переходах/конфигурациях не было пусто)
     // -----------------------------
     grist.onRecords(function (records) {
       rawRecords = records || [];
+      lastDataStamp = Date.now();
       scheduleRender();
-    });
+    }, { format: "rows", includeColumns: "normal" });
+
+    // Доп. страховка: если вдруг onRecords не пришёл при переходе на страницу — подгрузим сами
+    setInterval(() => {
+      const tooOld = (Date.now() - lastDataStamp) > 15000; // 15 секунд без обновлений
+      if (!document.hidden && tooOld) forceReloadFromGrist("watchdog");
+    }, 5000);
 
     // -----------------------------
     // 1) ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ
@@ -413,11 +448,8 @@
 
       dragCols.addEventListener('mousedown', (e) => {
         e.preventDefault();
-
         const startX = e.clientX;
         const headers = document.querySelectorAll('.pvtTable th');
-
-        // запоминаем ширину в "незумированных" px
         const initialWidths = Array.from(headers).map(th => th.getBoundingClientRect().width / currentZoom);
 
         const onMouseMove = (ev) => {
@@ -443,7 +475,6 @@
 
       dragRows.addEventListener('mousedown', (e) => {
         e.preventDefault();
-
         const startY = e.clientY;
         const rows = document.querySelectorAll('.pvtTable tr');
         const initialHeights = Array.from(rows).map(tr => tr.getBoundingClientRect().height / currentZoom);
