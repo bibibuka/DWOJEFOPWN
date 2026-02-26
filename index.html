@@ -19,14 +19,9 @@
       height: 48px; box-sizing: border-box;
       position: sticky; top: 0; z-index: 1000;
     }
-
-    .toolbar-group {
-      display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555;
-    }
-
+    .toolbar-group { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555; }
     input[type=range] { width: 90px; cursor: pointer; }
 
-    /* Кнопки глобального растягивания */
     .global-drag {
       display: inline-flex; align-items: center; justify-content: center;
       padding: 0 10px; height: 26px;
@@ -76,19 +71,23 @@
       box-sizing: border-box;
       height: 30px;
       min-width: 30px;
-      max-width: 0;
+
+      /* ВАЖНО: не ставим max-width:0 (иначе после перерисовки может схлопнуться) */
+      max-width: none;
     }
 
     .pvtTable th { background-color: #f2f2f2; font-weight: 600; }
 
     /* --- ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ --- */
     .resizer-col {
-      position: absolute; top: 0; right: 0; width: 6px; cursor: col-resize; z-index: 20; user-select: none; height: 100%;
+      position: absolute; top: 0; right: 0; width: 6px; cursor: col-resize;
+      z-index: 20; user-select: none; height: 100%;
     }
     .resizer-col:hover { border-right: 2px solid #169366; }
 
     .resizer-row {
-      position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; cursor: row-resize; z-index: 20; user-select: none;
+      position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; cursor: row-resize;
+      z-index: 20; user-select: none;
     }
     .resizer-row:hover { border-bottom: 2px solid #169366; }
 
@@ -105,15 +104,9 @@
     .clean-mode td.pvtRendererArea { padding: 0 !important; border: none !important; }
     .clean-mode .pvtTable th { cursor: default; background-image: none !important; }
 
-    /* FIX: список полей горизонтально (если Grist/тема перебивает pivot.css) */
-    #output .pvtHorizList li {
-      display: inline-block !important;  /* было "как раньше": плитками в строку */
-      float: none !important;
-    }
-    #output .pvtAxisContainer ul.pvtAttrList {
-      padding-left: 0 !important;
-      margin: 0 !important;
-    }
+    /* FIX: горизонтальный список полей (если тема Grist перебила pivot.css) */
+    #output .pvtHorizList li { display: inline-block !important; float: none !important; }
+    #output .pvtAxisContainer ul.pvtAttrList { padding-left: 0 !important; margin: 0 !important; }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -159,19 +152,15 @@
     let reloadInFlight = false;
     let lastDataStamp = 0;
 
-    // Важно: НЕ указываем columns: 'all' (это не про "все колонки")
+    // Важно: НЕ указываем columns:'all' (это про column-mapping, а не "все колонки")
     grist.ready({ requiredAccess: 'full' });
 
     // -----------------------------
     // HELPERS
     // -----------------------------
     async function getTableIdSafe() {
-      try {
-        return await grist.getTable().getTableId();
-      } catch (e) {
-        console.warn("Не удалось получить tableId", e);
-        return null;
-      }
+      try { return await grist.getTable().getTableId(); }
+      catch (e) { console.warn("Не удалось получить tableId", e); return null; }
     }
 
     async function getConfigKeyForCurrentTable() {
@@ -181,12 +170,7 @@
 
     function sanitizeConfig(savedConfig, fields) {
       const cleanArr = (a) => (Array.isArray(a) ? a.filter(x => fields.includes(x)) : []);
-      return {
-        ...savedConfig,
-        rows: cleanArr(savedConfig.rows),
-        cols: cleanArr(savedConfig.cols),
-        vals: cleanArr(savedConfig.vals),
-      };
+      return { ...savedConfig, rows: cleanArr(savedConfig.rows), cols: cleanArr(savedConfig.cols), vals: cleanArr(savedConfig.vals) };
     }
 
     function mapRecordsWithLabels(records) {
@@ -212,10 +196,7 @@
 
         let tableRef = null;
         for (let i = 0; i < nT; i++) {
-          if (tables.tableId[i] === tableId) {
-            tableRef = tables.id[i];
-            break;
-          }
+          if (tables.tableId[i] === tableId) { tableRef = tables.id[i]; break; }
         }
         if (!tableRef) return;
 
@@ -249,14 +230,12 @@
     }
 
     // -----------------------------
-    // FORCE RELOAD (чтобы не нужно было жать Restart при переходах)
+    // FORCE RELOAD (чтобы при переходах не нужен был Restart)
     // -----------------------------
     async function forceReloadFromGrist(reason = "") {
       if (reloadInFlight) return;
       reloadInFlight = true;
-
       try {
-        // Важно: includeColumns:'normal' -> все обычные колонки (нужен full access)
         const rows = await grist.fetchSelectedTable({ format: "rows", includeColumns: "normal" });
         rawRecords = rows || [];
         lastDataStamp = Date.now();
@@ -268,18 +247,21 @@
       }
     }
 
-    // 1) сразу при старте
+    // 1) старт
     setTimeout(() => forceReloadFromGrist("startup"), 0);
 
-    // 2) когда вкладка/виджет снова стал видимым (часто при переходе на другую страницу Grist)
+    // 2) вернулись на страницу
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) setTimeout(() => forceReloadFromGrist("visibilitychange"), 50);
     });
+    window.addEventListener("focus", () => setTimeout(() => forceReloadFromGrist("focus"), 50));
 
-    // 3) иногда полезно при возврате фокуса
-    window.addEventListener("focus", () => {
-      setTimeout(() => forceReloadFromGrist("focus"), 50);
-    });
+    // WATCHDOG (исправленный): НЕ перерисовывает каждые ~20 сек, только если pivot вообще не отрисован
+    setInterval(() => {
+      if (document.hidden) return;
+      const pivotExists = !!document.querySelector('#output .pvtTable');
+      if (!pivotExists) forceReloadFromGrist("watchdog_missing_pivot");
+    }, 5000);
 
     // -----------------------------
     // ЗУМ
@@ -328,11 +310,10 @@
     }
 
     // -----------------------------
-    // РЕНДЕР PIVOT
+    // RENDER PIVOT
     // -----------------------------
     async function renderPivot() {
       renderInProgress = true;
-
       try {
         await ensureTableContextUpToDate();
 
@@ -356,7 +337,6 @@
 
         const ruLocales = $.pivotUtilities.locales.ru;
         const tpl = $.pivotUtilities.aggregators;
-
         const myAggregators = {
           "Количество":            tpl["Count"],
           "Количество уникальных": tpl["Count Unique Values"],
@@ -381,7 +361,6 @@
           inclusions: safeConfig.inclusions,
           exclusions: safeConfig.exclusions,
 
-          // фиксируем горизонтальный список полей
           unusedAttrsVertical: false,
 
           onRefresh: function (cfg) {
@@ -406,7 +385,6 @@
           }
         };
 
-        // overwrite=true — чтобы при смене таблицы/страницы старый UI не мешал
         $("#output").empty().pivotUI(currentRecords, options, true);
 
         setTimeout(() => {
@@ -425,19 +403,12 @@
 
     // -----------------------------
     // GRIST: подписка на записи
-    // (Важно: includeColumns:'normal' чтобы при переходах/конфигурациях не было пусто)
     // -----------------------------
     grist.onRecords(function (records) {
       rawRecords = records || [];
       lastDataStamp = Date.now();
       scheduleRender();
     }, { format: "rows", includeColumns: "normal" });
-
-    // Доп. страховка: если вдруг onRecords не пришёл при переходе на страницу — подгрузим сами
-    setInterval(() => {
-      const tooOld = (Date.now() - lastDataStamp) > 15000; // 15 секунд без обновлений
-      if (!document.hidden && tooOld) forceReloadFromGrist("watchdog");
-    }, 5000);
 
     // -----------------------------
     // 1) ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ
@@ -533,8 +504,7 @@
     }
 
     function setupColResizer(cell, resizer) {
-      let startX = 0;
-      let startW = 0;
+      let startX = 0, startW = 0;
 
       const onMouseDown = (e) => {
         e.stopPropagation();
@@ -568,8 +538,7 @@
     }
 
     function setupRowResizer(cell, resizer) {
-      let startY = 0;
-      let startH = 0;
+      let startY = 0, startH = 0;
       const row = cell.parentElement;
 
       const onMouseDown = (e) => {
