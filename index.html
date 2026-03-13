@@ -18,8 +18,12 @@
       display: flex; justify-content: space-between; align-items: center;
       height: 48px; box-sizing: border-box;
       position: sticky; top: 0; z-index: 1000;
+      gap: 12px;
     }
-    .toolbar-group { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555; }
+    .toolbar-group {
+      display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555;
+      min-width: 0;
+    }
     input[type=range] { width: 90px; cursor: pointer; }
 
     .global-drag {
@@ -37,8 +41,39 @@
     button#toggle-mode {
       background-color: #169366; color: white; border: none; padding: 6px 15px;
       border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;
+      white-space: nowrap;
     }
     button#toggle-mode:hover { background-color: #127a55; }
+
+    #drill-toolbar {
+      display: none;
+      flex: 1 1 auto;
+      justify-content: center;
+      min-width: 0;
+    }
+    #drill-caption {
+      color: #444;
+      font-size: 13px;
+      font-weight: 600;
+      max-width: 420px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #drill-back {
+      background: #2d6cdf;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    #drill-back:hover {
+      background: #2157b6;
+    }
 
     /* --- КОНТЕЙНЕР --- */
     #output {
@@ -142,14 +177,47 @@
     .derivedTable td.metric-val {
       text-align: center;
       font-weight: 700;
-      color: #fff;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.18);
     }
 
     .derivedTable td.metric-na {
       background: #f3f3f3 !important;
       color: #999 !important;
-      text-shadow: none !important;
+    }
+
+    .week-drill-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      margin-right: 6px;
+      border-radius: 4px;
+      background: #e8f0fe;
+      color: #1a5fd0;
+      cursor: pointer;
+      font-weight: 700;
+      line-height: 1;
+      user-select: none;
+      vertical-align: middle;
+      border: 1px solid #c7dafd;
+    }
+    .week-drill-toggle:hover {
+      background: #d6e7ff;
+    }
+
+    .header-label-wrap {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .header-label-text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
     }
   </style>
 
@@ -166,6 +234,11 @@
       <span>🔍</span>
       <input type="range" id="zoom-slider" min="0.5" max="1.5" step="0.1" value="1">
       <span id="zoom-val" style="width: 40px;">100%</span>
+    </div>
+
+    <div class="toolbar-group" id="drill-toolbar">
+      <span id="drill-caption"></span>
+      <button id="drill-back" type="button">← Назад к неделям</button>
     </div>
 
     <div class="toolbar-group">
@@ -197,6 +270,7 @@
     let reloadInFlight = false;
     let lastDataStamp = 0;
 
+    // base config (пользовательский)
     let currentPivotConfig = {
       rows: [],
       cols: [],
@@ -207,10 +281,31 @@
       aggregatorName: "Количество"
     };
 
+    // effective config (то, что реально показано после drill-down)
+    let currentDisplayedConfig = {
+      rows: [],
+      cols: [],
+      vals: [],
+      inclusions: {},
+      exclusions: {},
+      rendererName: "Таблица",
+      aggregatorName: "Количество"
+    };
+
+    let lastDerivedRenderMeta = null;
+
+    let drillState = {
+      active: false,
+      weekField: null,
+      dateField: null,
+      weekValue: null,
+      weekLabel: ''
+    };
+
     grist.ready({ requiredAccess: 'full' });
 
     // -----------------------------
-    // КОНСТАНТЫ ДЛЯ KPI / COUNTA
+    // КОНСТАНТЫ ДЛЯ KPI / COUNTA / DRILL
     // -----------------------------
     const STATUS_FIELD_ALIASES = [
       'СТАТУС ВОРОНКИ',
@@ -224,6 +319,17 @@
       'ФИО КАНДИДАТА',
       'КАНДИДАТ',
       'СОТРУДНИК'
+    ];
+
+    const WEEK_FIELD_ALIASES = [
+      'НЕДЕЛЯ',
+      'WEEK'
+    ];
+
+    const DATE_FIELD_ALIASES = [
+      'ДАТА',
+      'DATE',
+      'ДЕНЬ'
     ];
 
     const STATUS_ALIASES = {
@@ -262,6 +368,10 @@
         cols: cleanArr(savedConfig.cols),
         vals: cleanArr(savedConfig.vals)
       };
+    }
+
+    function deepClone(obj) {
+      return JSON.parse(JSON.stringify(obj || {}));
     }
 
     function mapRecordsWithLabels(records) {
@@ -373,47 +483,27 @@
       return yiq >= 145 ? '#222' : '#fff';
     }
 
-    // -----------------------------
-    // ПАЛИТРА KPI КАК НА СКРИНЕ
-    // красный -> оранжевый -> жёлтый -> салатовый -> зелёный
-    // -----------------------------
-    const KPI_HEAT_STOPS = [
-      { t: 0.00, color: '#de6b6b' }, // красный
-      { t: 0.25, color: '#e6a05f' }, // оранжевый
-      { t: 0.50, color: '#efd46d' }, // жёлтый
-      { t: 0.75, color: '#a9bf58' }, // салатовый
-      { t: 1.00, color: '#54aa69' }  // зелёный
-    ];
-
-    function interpolateMultiStopColor(stops, t) {
-      const clamped = Math.max(0, Math.min(1, t));
-
-      if (clamped <= stops[0].t) return stops[0].color;
-      if (clamped >= stops[stops.length - 1].t) return stops[stops.length - 1].color;
-
-      for (let i = 0; i < stops.length - 1; i++) {
-        const left = stops[i];
-        const right = stops[i + 1];
-
-        if (clamped >= left.t && clamped <= right.t) {
-          const span = right.t - left.t || 1;
-          const localT = (clamped - left.t) / span;
-          return mixColors(left.color, right.color, localT);
-        }
-      }
-
-      return stops[stops.length - 1].color;
-    }
-
     function getHeatColor(value, min, max) {
       if (value == null || !Number.isFinite(value)) return '#f3f3f3';
-
       if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-        return interpolateMultiStopColor(KPI_HEAT_STOPS, 0.5);
+        return 'rgb(210, 230, 190)';
       }
 
-      const t = (value - min) / (max - min);
-      return interpolateMultiStopColor(KPI_HEAT_STOPS, t);
+      const low  = '#e57373';
+      const mid  = '#f6d365';
+      const high = '#6aa84f';
+
+      const midpoint = (min + max) / 2;
+
+      if (value <= midpoint) {
+        const denom = (midpoint - min) || 1;
+        const t = Math.max(0, Math.min(1, (value - min) / denom));
+        return mixColors(low, mid, t);
+      } else {
+        const denom = (max - midpoint) || 1;
+        const t = Math.max(0, Math.min(1, (value - midpoint) / denom));
+        return mixColors(mid, high, t);
+      }
     }
 
     function findFieldByAliases(fields, aliases) {
@@ -548,6 +638,95 @@
       if (STATUS_ALIAS_SETS.shiftAssigned.has(normalizedStatus))    bucket.shiftAssigned += 1;
     }
 
+    // -----------------------------
+    // DRILL-DOWN
+    // -----------------------------
+    function getWeekDrillCapability(fields, baseConfig) {
+      const weekField = findFieldByAliases(fields, WEEK_FIELD_ALIASES);
+      const dateField = findFieldByAliases(fields, DATE_FIELD_ALIASES);
+
+      const cols = Array.isArray(baseConfig?.cols) ? baseConfig.cols : [];
+      const onlyWeekInCols =
+        !!weekField &&
+        cols.length === 1 &&
+        normalizeLabel(cols[0]) === normalizeLabel(weekField);
+
+      return {
+        canDrill: !!weekField && !!dateField && onlyWeekInCols,
+        weekField,
+        dateField
+      };
+    }
+
+    function buildEffectivePivotConfig(baseConfig, fields) {
+      const effective = deepClone(baseConfig);
+
+      if (!drillState.active) {
+        return effective;
+      }
+
+      const { weekField, dateField } = getWeekDrillCapability(fields, baseConfig);
+
+      if (!weekField || !dateField) {
+        drillState.active = false;
+        updateDrillUi();
+        return effective;
+      }
+
+      effective.cols = [dateField];
+      effective.inclusions = deepClone(effective.inclusions || {});
+      effective.inclusions[weekField] = [drillState.weekValue];
+
+      return effective;
+    }
+
+    function openWeekDrill(weekValue, weekLabel) {
+      const fields = mappedRecords.length ? Object.keys(mappedRecords[0]) : [];
+      const cap = getWeekDrillCapability(fields, currentPivotConfig);
+      if (!cap.canDrill) return;
+
+      drillState = {
+        active: true,
+        weekField: cap.weekField,
+        dateField: cap.dateField,
+        weekValue,
+        weekLabel: weekLabel || formatHeaderValue(weekValue)
+      };
+
+      updateDrillUi();
+      scheduleRender();
+    }
+
+    function resetDrill() {
+      drillState = {
+        active: false,
+        weekField: null,
+        dateField: null,
+        weekValue: null,
+        weekLabel: ''
+      };
+      updateDrillUi();
+      scheduleRender();
+    }
+
+    function updateDrillUi() {
+      const bar = document.getElementById('drill-toolbar');
+      const caption = document.getElementById('drill-caption');
+
+      if (drillState.active) {
+        bar.style.display = 'flex';
+        caption.textContent = `Детализация недели: ${drillState.weekLabel}`;
+      } else {
+        bar.style.display = 'none';
+        caption.textContent = '';
+      }
+    }
+
+    document.getElementById('drill-back').addEventListener('click', resetDrill);
+
+    // -----------------------------
+    // KPI BUILD
+    // -----------------------------
     function buildDerivedMetricsFromRecords(records, config) {
       if (!records || !records.length) return null;
 
@@ -590,6 +769,7 @@
 
       let orderedBuckets = [];
       let colLabels = [];
+      let colKeys = [];
 
       if (colFields.length > 0) {
         const orderedKeys = sortKeyArrays(
@@ -598,12 +778,15 @@
 
         orderedBuckets = orderedKeys.map(keyArr => byColKey.get(keyToString(keyArr)) || createCounterBucket());
         colLabels = orderedKeys.map(keyArr => keyArr.map(formatHeaderValue).join(' / '));
+        colKeys = orderedKeys.map(keyArr => keyArr);
 
         orderedBuckets.push(grandBucket);
         colLabels.push('Итого');
+        colKeys.push(null);
       } else {
         orderedBuckets = [grandBucket];
         colLabels = ['Итого'];
+        colKeys = [null];
       }
 
       const metrics = [
@@ -647,10 +830,14 @@
       return {
         metrics,
         colCount: orderedBuckets.length,
-        colLabels
+        colLabels,
+        colKeys
       };
     }
 
+    // -----------------------------
+    // LAYOUT / WIDTHS
+    // -----------------------------
     function getMainTableLayoutHints(expectedCols) {
       let labelWidth = 260;
       let dataWidths = Array(expectedCols).fill(80);
@@ -739,6 +926,63 @@
       });
     }
 
+    // -----------------------------
+    // DRILL DECORATION
+    // -----------------------------
+    function decorateMainWeekHeadersForDrill() {
+      const mainTable = document.querySelector('#output .pvtRendererArea .pvtTable:not(.derivedTable)');
+      if (!mainTable) return;
+
+      mainTable.querySelectorAll('.week-drill-toggle').forEach(el => el.remove());
+
+      if (drillState.active) return;
+      if (!lastDerivedRenderMeta) return;
+      if (!mappedRecords.length) return;
+
+      const fields = Object.keys(mappedRecords[0] || {});
+      const cap = getWeekDrillCapability(fields, currentPivotConfig);
+      if (!cap.canDrill) return;
+
+      const headerRows = Array.from(mainTable.querySelectorAll('thead tr'));
+      if (!headerRows.length) return;
+
+      const bottomRow = headerRows[headerRows.length - 1];
+      const leafHeaders = Array.from(bottomRow.querySelectorAll('th.pvtColLabel, th.pvtTotalLabel'));
+      if (!leafHeaders.length) return;
+
+      let idx = 0;
+      leafHeaders.forEach(th => {
+        const metaLabel = lastDerivedRenderMeta.colLabels[idx];
+        const metaKey = lastDerivedRenderMeta.colKeys[idx];
+
+        if (!metaLabel) {
+          idx++;
+          return;
+        }
+
+        if (metaLabel !== 'Итого' && Array.isArray(metaKey) && metaKey.length > 0) {
+          const weekValue = metaKey[0];
+
+          const btn = document.createElement('span');
+          btn.className = 'week-drill-toggle';
+          btn.textContent = '▸';
+          btn.title = `Открыть дни недели ${metaLabel}`;
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openWeekDrill(weekValue, metaLabel);
+          });
+
+          th.insertBefore(btn, th.firstChild);
+        }
+
+        idx++;
+      });
+    }
+
+    // -----------------------------
+    // SECOND TABLE RENDER
+    // -----------------------------
     function renderSecondFormulaTable() {
       const rendererArea = document.querySelector('#output .pvtRendererArea');
       if (!rendererArea) return;
@@ -746,11 +990,19 @@
       const old = document.getElementById('secondary-table-wrap');
       if (old) old.remove();
 
-      const result = buildDerivedMetricsFromRecords(mappedRecords, currentPivotConfig);
+      lastDerivedRenderMeta = null;
+
+      const result = buildDerivedMetricsFromRecords(mappedRecords, currentDisplayedConfig);
       if (!result) return;
 
-      const { metrics, colCount, colLabels } = result;
+      lastDerivedRenderMeta = result;
+
+      const { metrics, colCount, colLabels, colKeys } = result;
       const { labelWidth, dataWidths } = getMainTableLayoutHints(colCount);
+
+      const fields = mappedRecords.length ? Object.keys(mappedRecords[0]) : [];
+      const drillCap = getWeekDrillCapability(fields, currentPivotConfig);
+      const canDrillNow = drillCap.canDrill && !drillState.active;
 
       const wrap = document.createElement('div');
       wrap.id = 'secondary-table-wrap';
@@ -772,13 +1024,34 @@
       colLabels.forEach((label, idx) => {
         const th = document.createElement('th');
         th.className = 'metric-col-header pvtColLabel';
-        th.textContent = label;
 
         const w = dataWidths[idx] || 80;
         th.style.width = `${w}px`;
         th.style.minWidth = `${w}px`;
         th.style.maxWidth = `${w}px`;
 
+        const wrapEl = document.createElement('span');
+        wrapEl.className = 'header-label-wrap';
+
+        if (canDrillNow && label !== 'Итого' && Array.isArray(colKeys[idx]) && colKeys[idx].length > 0) {
+          const btn = document.createElement('span');
+          btn.className = 'week-drill-toggle';
+          btn.textContent = '▸';
+          btn.title = `Открыть дни недели ${label}`;
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openWeekDrill(colKeys[idx][0], label);
+          });
+          wrapEl.appendChild(btn);
+        }
+
+        const textSpan = document.createElement('span');
+        textSpan.className = 'header-label-text';
+        textSpan.textContent = label;
+        wrapEl.appendChild(textSpan);
+
+        th.appendChild(wrapEl);
         headTr.appendChild(th);
       });
 
@@ -817,7 +1090,7 @@
           } else {
             const bg = getHeatColor(val, min, max);
             td.style.backgroundColor = bg;
-            td.style.color = '#fff';
+            td.style.color = getTextColorForBg(bg);
           }
 
           tr.appendChild(td);
@@ -835,8 +1108,10 @@
       initIndividualResizing();
       renderSecondFormulaTable();
       syncSecondaryTableWidthsFromMain();
+      decorateMainWeekHeadersForDrill();
       initIndividualResizing();
       applyZoom();
+      updateDrillUi();
     }
 
     // -----------------------------
@@ -979,19 +1254,21 @@
           aggregatorName: resolvedAggregatorName
         };
 
+        currentDisplayedConfig = buildEffectivePivotConfig(currentPivotConfig, fields);
+
         const options = {
           renderers: ruLocales.renderers,
           aggregators: myAggregators,
 
-          rendererName: currentPivotConfig.rendererName,
-          aggregatorName: currentPivotConfig.aggregatorName,
+          rendererName: currentDisplayedConfig.rendererName,
+          aggregatorName: currentDisplayedConfig.aggregatorName,
 
-          rows: currentPivotConfig.rows,
-          cols: currentPivotConfig.cols,
-          vals: currentPivotConfig.vals,
+          rows: currentDisplayedConfig.rows,
+          cols: currentDisplayedConfig.cols,
+          vals: currentDisplayedConfig.vals,
 
-          inclusions: currentPivotConfig.inclusions,
-          exclusions: currentPivotConfig.exclusions,
+          inclusions: currentDisplayedConfig.inclusions,
+          exclusions: currentDisplayedConfig.exclusions,
 
           unusedAttrsVertical: false,
 
@@ -1001,15 +1278,35 @@
               refreshedAggregatorName = "Количество";
             }
 
-            currentPivotConfig = {
-              rows: cfg.rows || [],
-              cols: cfg.cols || [],
-              vals: cfg.vals || [],
-              inclusions: cfg.inclusions || {},
-              exclusions: cfg.exclusions || {},
-              rendererName: cfg.rendererName || "Таблица",
-              aggregatorName: refreshedAggregatorName
-            };
+            if (drillState.active) {
+              currentDisplayedConfig = {
+                rows: cfg.rows || [],
+                cols: cfg.cols || [],
+                vals: cfg.vals || [],
+                inclusions: cfg.inclusions || {},
+                exclusions: cfg.exclusions || {},
+                rendererName: cfg.rendererName || "Таблица",
+                aggregatorName: refreshedAggregatorName
+              };
+
+              // В drill-режиме не перезаписываем базовую структуру rows/cols.
+              currentPivotConfig = {
+                ...currentPivotConfig,
+                rendererName: currentDisplayedConfig.rendererName,
+                aggregatorName: currentDisplayedConfig.aggregatorName
+              };
+            } else {
+              currentPivotConfig = {
+                rows: cfg.rows || [],
+                cols: cfg.cols || [],
+                vals: cfg.vals || [],
+                inclusions: cfg.inclusions || {},
+                exclusions: cfg.exclusions || {},
+                rendererName: cfg.rendererName || "Таблица",
+                aggregatorName: refreshedAggregatorName
+              };
+              currentDisplayedConfig = deepClone(currentPivotConfig);
+            }
 
             const configToSave = {
               rows: currentPivotConfig.rows,
