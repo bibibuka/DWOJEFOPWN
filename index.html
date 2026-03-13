@@ -402,9 +402,7 @@
       }
 
       if (typeof coll === 'object') {
-        Object.keys(coll).forEach(k => {
-          out.add(normalizeComparableValue(k));
-        });
+        Object.keys(coll).forEach(k => out.add(normalizeComparableValue(k)));
         return out;
       }
 
@@ -437,9 +435,8 @@
 
     function naturalCompare(a, b) {
       const nat = $.pivotUtilities?.naturalSort;
-      if (typeof nat === 'function') {
-        return nat(a, b);
-      }
+      if (typeof nat === 'function') return nat(a, b);
+
       return String(a ?? '').localeCompare(String(b ?? ''), 'ru', {
         numeric: true,
         sensitivity: 'base'
@@ -531,14 +528,11 @@
 
       const ensureBucket = (keyArr) => {
         const key = keyToString(keyArr);
-        if (!byColKey.has(key)) {
-          byColKey.set(key, createCounterBucket());
-        }
+        if (!byColKey.has(key)) byColKey.set(key, createCounterBucket());
         return byColKey.get(key);
       };
 
       for (const rec of filteredRecords) {
-        // COUNTA из ФИО: считаем только записи, где поле ФИО непустое
         if (countaField && !isCountaValue(rec[countaField])) continue;
 
         const normalizedStatus = normalizeLabel(rec[statusField]);
@@ -558,7 +552,7 @@
           Array.from(byColKey.keys()).map(k => JSON.parse(k))
         );
         orderedBuckets = orderedKeys.map(keyArr => byColKey.get(keyToString(keyArr)) || createCounterBucket());
-        orderedBuckets.push(grandBucket); // Итого
+        orderedBuckets.push(grandBucket);
       } else {
         orderedBuckets = [grandBucket];
       }
@@ -603,10 +597,7 @@
 
       return {
         metrics,
-        colCount: orderedBuckets.length,
-        statusField,
-        countaField,
-        filteredCount: filteredRecords.length
+        colCount: orderedBuckets.length
       };
     }
 
@@ -617,10 +608,9 @@
       const rendererArea = document.querySelector('#output .pvtRendererArea');
       if (!rendererArea) return { labelWidth, dataWidths };
 
-      const tables = rendererArea.querySelectorAll('.pvtTable');
-      if (!tables.length) return { labelWidth, dataWidths };
+      const mainTable = rendererArea.querySelector('.pvtTable:not(.derivedTable)');
+      if (!mainTable) return { labelWidth, dataWidths };
 
-      const mainTable = tables[0];
       const bodyRows = Array.from(mainTable.querySelectorAll('tbody tr'));
       if (!bodyRows.length) return { labelWidth, dataWidths };
 
@@ -661,6 +651,36 @@
       }
 
       return { labelWidth, dataWidths };
+    }
+
+    function syncSecondaryTableWidthsFromMain() {
+      const wrap = document.getElementById('secondary-table-wrap');
+      if (!wrap) return;
+
+      const derivedTable = wrap.querySelector('.derivedTable');
+      if (!derivedTable) return;
+
+      const firstRow = derivedTable.querySelector('tr');
+      if (!firstRow) return;
+
+      const expectedCols = firstRow.querySelectorAll('td.metric-val').length;
+      const { labelWidth, dataWidths } = getMainTableLayoutHints(expectedCols);
+
+      derivedTable.querySelectorAll('tr').forEach(tr => {
+        const th = tr.querySelector('th.metric-label');
+        if (th) {
+          th.style.width = `${labelWidth}px`;
+          th.style.minWidth = `${labelWidth}px`;
+          th.style.maxWidth = `${labelWidth}px`;
+        }
+
+        tr.querySelectorAll('td.metric-val').forEach((td, idx) => {
+          const w = dataWidths[idx] || 80;
+          td.style.width = `${w}px`;
+          td.style.minWidth = `${w}px`;
+          td.style.maxWidth = `${w}px`;
+        });
+      });
     }
 
     function renderSecondFormulaTable() {
@@ -731,6 +751,7 @@
     function postRenderEnhance() {
       initIndividualResizing();
       renderSecondFormulaTable();
+      syncSecondaryTableWidthsFromMain();
       initIndividualResizing();
       applyZoom();
     }
@@ -854,7 +875,6 @@
           "Кол-во по столбцу":     tpl["Count as Fraction of Columns"]
         };
 
-        // Добавляем COUNTA по ФИО как отдельный вариант, но не меняем дефолт
         if (countaField) {
           myAggregators[`COUNTA по ${countaField}`] = makeCountaAggregatorForField(countaField, intFormatter);
         }
@@ -965,23 +985,32 @@
       dragCols.addEventListener('mousedown', (e) => {
         e.preventDefault();
         const startX = e.clientX;
-        const headers = document.querySelectorAll('.pvtTable th');
+
+        const mainTable = document.querySelector('#output .pvtRendererArea .pvtTable:not(.derivedTable)');
+        const headers = mainTable
+          ? mainTable.querySelectorAll('th')
+          : document.querySelectorAll('.pvtTable:not(.derivedTable) th');
+
         const initialWidths = Array.from(headers).map(th => th.getBoundingClientRect().width / currentZoom);
 
         const onMouseMove = (ev) => {
           const dx = (ev.clientX - startX) / currentZoom;
+
           headers.forEach((th, idx) => {
             const newW = Math.max(30, initialWidths[idx] + dx);
             th.style.width = `${newW}px`;
             th.style.maxWidth = `${newW}px`;
             th.style.minWidth = '30px';
           });
+
+          syncSecondaryTableWidthsFromMain();
         };
 
         const onMouseUp = () => {
           document.removeEventListener('mousemove', onMouseMove);
           document.removeEventListener('mouseup', onMouseUp);
           document.body.style.cursor = '';
+          syncSecondaryTableWidthsFromMain();
         };
 
         document.addEventListener('mousemove', onMouseMove);
@@ -1032,7 +1061,10 @@
         th.style.maxWidth = `${cssWidth}px`;
       });
 
-      const allCells = document.querySelectorAll('.pvtTable th, .pvtTable .pvtRowLabel, .pvtTable .pvtColLabel');
+      const allCells = document.querySelectorAll(
+        '.pvtTable th, .pvtTable .pvtRowLabel, .pvtTable .pvtColLabel, .derivedTable td.metric-val'
+      );
+
       allCells.forEach(cell => {
         if (cell.querySelector('.resizer-col')) return;
 
@@ -1066,9 +1098,27 @@
       const onMouseMove = (e) => {
         const dx = (e.clientX - startX) / currentZoom;
         const newW = Math.max(30, startW + dx);
-        cell.style.width = `${newW}px`;
-        cell.style.maxWidth = `${newW}px`;
-        cell.style.minWidth = '30px';
+
+        const table = cell.closest('table');
+        const isDerived = table && table.classList.contains('derivedTable');
+
+        if (isDerived) {
+          const cellIndex = cell.cellIndex;
+
+          table.querySelectorAll('tr').forEach(tr => {
+            const targetCell = tr.children[cellIndex];
+            if (!targetCell) return;
+            targetCell.style.width = `${newW}px`;
+            targetCell.style.maxWidth = `${newW}px`;
+            targetCell.style.minWidth = '30px';
+          });
+        } else {
+          cell.style.width = `${newW}px`;
+          cell.style.maxWidth = `${newW}px`;
+          cell.style.minWidth = '30px';
+
+          syncSecondaryTableWidthsFromMain();
+        }
       };
 
       const onMouseUp = () => {
@@ -1077,6 +1127,7 @@
         resizer.style.borderRight = '';
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
+        syncSecondaryTableWidthsFromMain();
       };
 
       resizer.addEventListener('mousedown', onMouseDown);
