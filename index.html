@@ -71,8 +71,6 @@
       box-sizing: border-box;
       height: 30px;
       min-width: 30px;
-
-      /* ВАЖНО: не ставим max-width:0 (иначе после перерисовки может схлопнуться) */
       max-width: none;
     }
 
@@ -104,9 +102,38 @@
     .clean-mode td.pvtRendererArea { padding: 0 !important; border: none !important; }
     .clean-mode .pvtTable th { cursor: default; background-image: none !important; }
 
-    /* FIX: горизонтальный список полей (если тема Grist перебила pivot.css) */
+    /* FIX: горизонтальный список полей */
     #output .pvtHorizList li { display: inline-block !important; float: none !important; }
     #output .pvtAxisContainer ul.pvtAttrList { padding-left: 0 !important; margin: 0 !important; }
+
+    /* --- ВТОРАЯ KPI-ТАБЛИЦА --- */
+    #secondary-table-wrap {
+      margin-top: 24px;
+      width: max-content;
+    }
+
+    .derivedTable {
+      border-collapse: collapse;
+      width: max-content;
+      min-width: auto;
+    }
+
+    .derivedTable th.metric-label {
+      background: #93a7c7;
+      color: #fff;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .derivedTable td.metric-val {
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .derivedTable td.metric-na {
+      background: #f3f3f3 !important;
+      color: #999 !important;
+    }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -140,7 +167,8 @@
     // СОСТОЯНИЕ
     // -----------------------------
     let rawRecords = [];
-    let columnLabels = {};     // colId -> label для текущей таблицы
+    let mappedRecords = [];
+    let columnLabels = {};
     let currentTableId = null;
 
     let isViewOnly = false;
@@ -152,8 +180,49 @@
     let reloadInFlight = false;
     let lastDataStamp = 0;
 
-    // Важно: НЕ указываем columns:'all' (это про column-mapping, а не "все колонки")
+    let currentPivotConfig = {
+      rows: [],
+      cols: [],
+      vals: [],
+      inclusions: {},
+      exclusions: {},
+      rendererName: "Таблица",
+      aggregatorName: "Количество"
+    };
+
     grist.ready({ requiredAccess: 'full' });
+
+    // -----------------------------
+    // КОНСТАНТЫ ДЛЯ KPI / COUNTA
+    // -----------------------------
+    const STATUS_FIELD_ALIASES = [
+      'СТАТУС ВОРОНКИ',
+      'СТАТУС',
+      'ЭТАП ВОРОНКИ'
+    ];
+
+    const COUNTA_FIELD_ALIASES = [
+      'ФИО',
+      'FIO',
+      'ФИО КАНДИДАТА',
+      'КАНДИДАТ',
+      'СОТРУДНИК'
+    ];
+
+    const STATUS_ALIASES = {
+      authorized:       ['АВТОРИЗОВАЛСЯ'],
+      firstShift:       ['ВЫШЕЛ НА СМЕНУ'],
+      lmkUploaded:      ['ЗАГРУЗИЛ ЛМК'],
+      passportUploaded: ['ЗАГРУЗИЛ ПАСПОРТ'],
+      registeredInPark: ['ЗАРЕГИСТРИРОВАЛИ В ПАРКЕ'],
+      lmkExpiring:      ['ЛМК ЗАКАНЧИВАЕТСЯ'],
+      lmkExpired:       ['ЛМК ЗАКОНЧИЛАСЬ', 'ЛМК ЗАКОНЧИЛСЯ'],
+      shiftAssigned:    ['НАЗНАЧЕНА СМЕНА']
+    };
+
+    const STATUS_ALIAS_SETS = Object.fromEntries(
+      Object.entries(STATUS_ALIASES).map(([k, arr]) => [k, new Set(arr.map(normalizeLabel))])
+    );
 
     // -----------------------------
     // HELPERS
@@ -170,7 +239,12 @@
 
     function sanitizeConfig(savedConfig, fields) {
       const cleanArr = (a) => (Array.isArray(a) ? a.filter(x => fields.includes(x)) : []);
-      return { ...savedConfig, rows: cleanArr(savedConfig.rows), cols: cleanArr(savedConfig.cols), vals: cleanArr(savedConfig.vals) };
+      return {
+        ...savedConfig,
+        rows: cleanArr(savedConfig.rows),
+        cols: cleanArr(savedConfig.cols),
+        vals: cleanArr(savedConfig.vals)
+      };
     }
 
     function mapRecordsWithLabels(records) {
@@ -191,16 +265,19 @@
         const tableId = await getTableIdSafe();
         if (!tableId) return;
 
-        const tables = await grist.docApi.fetchTable('_grist_Tables'); // columns-oriented
+        const tables = await grist.docApi.fetchTable('_grist_Tables');
         const nT = (tables.tableId || []).length;
 
         let tableRef = null;
         for (let i = 0; i < nT; i++) {
-          if (tables.tableId[i] === tableId) { tableRef = tables.id[i]; break; }
+          if (tables.tableId[i] === tableId) {
+            tableRef = tables.id[i];
+            break;
+          }
         }
         if (!tableRef) return;
 
-        const cols = await grist.docApi.fetchTable('_grist_Tables_column'); // columns-oriented
+        const cols = await grist.docApi.fetchTable('_grist_Tables_column');
         const nC = (cols.colId || []).length;
 
         for (let i = 0; i < nC; i++) {
@@ -225,12 +302,441 @@
     }
 
     function scheduleRender() {
-      if (renderInProgress) { renderPending = true; return; }
+      if (renderInProgress) {
+        renderPending = true;
+        return;
+      }
       renderPivot();
     }
 
+    function normalizeLabel(v) {
+      return String(v ?? '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase()
+        .replace(/Ё/g, 'Е');
+    }
+
+    function safeDiv(a, b) {
+      return (b === 0 || b == null || !Number.isFinite(b)) ? null : a / b;
+    }
+
+    function formatPercentRU(value, digits = 2) {
+      if (value == null || !Number.isFinite(value)) return '—';
+      return (value * 100).toFixed(digits).replace('.', ',') + '%';
+    }
+
+    function hexToRgb(hex) {
+      const clean = hex.replace('#', '');
+      return {
+        r: parseInt(clean.substring(0, 2), 16),
+        g: parseInt(clean.substring(2, 4), 16),
+        b: parseInt(clean.substring(4, 6), 16)
+      };
+    }
+
+    function mixColors(c1, c2, t) {
+      const a = hexToRgb(c1);
+      const b = hexToRgb(c2);
+      const lerp = (x, y) => Math.round(x + (y - x) * t);
+      return `rgb(${lerp(a.r, b.r)}, ${lerp(a.g, b.g)}, ${lerp(a.b, b.b)})`;
+    }
+
+    function getTextColorForBg(color) {
+      const m = color.match(/\d+/g);
+      if (!m) return '#222';
+      const [r, g, b] = m.map(Number);
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      return yiq >= 145 ? '#222' : '#fff';
+    }
+
+    function getHeatColor(value, min, max) {
+      if (value == null || !Number.isFinite(value)) return '#f3f3f3';
+      if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+        return 'rgb(210, 230, 190)';
+      }
+
+      const low  = '#e57373';
+      const mid  = '#f6d365';
+      const high = '#6aa84f';
+
+      const midpoint = (min + max) / 2;
+
+      if (value <= midpoint) {
+        const denom = (midpoint - min) || 1;
+        const t = Math.max(0, Math.min(1, (value - min) / denom));
+        return mixColors(low, mid, t);
+      } else {
+        const denom = (max - midpoint) || 1;
+        const t = Math.max(0, Math.min(1, (value - midpoint) / denom));
+        return mixColors(mid, high, t);
+      }
+    }
+
+    function findFieldByAliases(fields, aliases) {
+      const lookup = new Map(fields.map(f => [normalizeLabel(f), f]));
+      for (const alias of aliases) {
+        const found = lookup.get(normalizeLabel(alias));
+        if (found) return found;
+      }
+      return null;
+    }
+
+    function normalizeComparableValue(v) {
+      if (v === null || v === undefined) return 'null';
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+      if (v instanceof Date) return String(v.getTime());
+      if (typeof v === 'object') {
+        try { return JSON.stringify(v); } catch (e) { return String(v); }
+      }
+      return String(v);
+    }
+
+    function collectionToComparableSet(coll) {
+      const out = new Set();
+      if (!coll) return out;
+
+      if (Array.isArray(coll)) {
+        coll.forEach(v => out.add(normalizeComparableValue(v)));
+        return out;
+      }
+
+      if (typeof coll === 'object') {
+        Object.keys(coll).forEach(k => {
+          out.add(normalizeComparableValue(k));
+        });
+        return out;
+      }
+
+      out.add(normalizeComparableValue(coll));
+      return out;
+    }
+
+    function recordMatchesPivotFilters(record, config) {
+      const inclusions = config?.inclusions || {};
+      const exclusions = config?.exclusions || {};
+
+      for (const [field, allowed] of Object.entries(inclusions)) {
+        const allowedSet = collectionToComparableSet(allowed);
+        if (!allowedSet.size) continue;
+
+        const recVal = normalizeComparableValue(record[field]);
+        if (!allowedSet.has(recVal)) return false;
+      }
+
+      for (const [field, blocked] of Object.entries(exclusions)) {
+        const blockedSet = collectionToComparableSet(blocked);
+        if (!blockedSet.size) continue;
+
+        const recVal = normalizeComparableValue(record[field]);
+        if (blockedSet.has(recVal)) return false;
+      }
+
+      return true;
+    }
+
+    function naturalCompare(a, b) {
+      const nat = $.pivotUtilities?.naturalSort;
+      if (typeof nat === 'function') {
+        return nat(a, b);
+      }
+      return String(a ?? '').localeCompare(String(b ?? ''), 'ru', {
+        numeric: true,
+        sensitivity: 'base'
+      });
+    }
+
+    function sortKeyArrays(keys) {
+      return [...keys].sort((ka, kb) => {
+        const len = Math.max(ka.length, kb.length);
+        for (let i = 0; i < len; i++) {
+          const cmp = naturalCompare(ka[i], kb[i]);
+          if (cmp !== 0) return cmp;
+        }
+        return 0;
+      });
+    }
+
+    function isCountaValue(v) {
+      if (v === null || v === undefined) return false;
+      if (typeof v === 'string') return v.trim() !== '';
+      return true;
+    }
+
+    function makeCountaAggregatorForField(fieldName, formatter) {
+      return function() {
+        return function(data, rowKey, colKey) {
+          let count = 0;
+          return {
+            push(record) {
+              if (isCountaValue(record[fieldName])) count++;
+            },
+            value() {
+              return count;
+            },
+            format: formatter || (x => String(x)),
+            numInputs: 0
+          };
+        };
+      };
+    }
+
+    function createCounterBucket() {
+      return {
+        total: 0,
+        authorized: 0,
+        firstShift: 0,
+        lmkUploaded: 0,
+        passportUploaded: 0,
+        registeredInPark: 0,
+        lmkExpiring: 0,
+        lmkExpired: 0,
+        shiftAssigned: 0
+      };
+    }
+
+    function incrementBucket(bucket, normalizedStatus) {
+      bucket.total += 1;
+
+      if (STATUS_ALIAS_SETS.authorized.has(normalizedStatus))       bucket.authorized += 1;
+      if (STATUS_ALIAS_SETS.firstShift.has(normalizedStatus))       bucket.firstShift += 1;
+      if (STATUS_ALIAS_SETS.lmkUploaded.has(normalizedStatus))      bucket.lmkUploaded += 1;
+      if (STATUS_ALIAS_SETS.passportUploaded.has(normalizedStatus)) bucket.passportUploaded += 1;
+      if (STATUS_ALIAS_SETS.registeredInPark.has(normalizedStatus)) bucket.registeredInPark += 1;
+      if (STATUS_ALIAS_SETS.lmkExpiring.has(normalizedStatus))      bucket.lmkExpiring += 1;
+      if (STATUS_ALIAS_SETS.lmkExpired.has(normalizedStatus))       bucket.lmkExpired += 1;
+      if (STATUS_ALIAS_SETS.shiftAssigned.has(normalizedStatus))    bucket.shiftAssigned += 1;
+    }
+
+    function buildDerivedMetricsFromRecords(records, config) {
+      if (!records || !records.length) return null;
+
+      const fields = Object.keys(records[0] || {});
+      const statusField = findFieldByAliases(fields, STATUS_FIELD_ALIASES);
+      if (!statusField) return null;
+
+      const countaField = findFieldByAliases(fields, COUNTA_FIELD_ALIASES);
+
+      const colFields = Array.isArray(config?.cols)
+        ? config.cols.filter(f => fields.includes(f))
+        : [];
+
+      const filteredRecords = records.filter(rec => recordMatchesPivotFilters(rec, config));
+
+      const grandBucket = createCounterBucket();
+      const byColKey = new Map();
+
+      const getKeyArr = (rec) => colFields.map(f => rec[f] ?? null);
+      const keyToString = (arr) => JSON.stringify(arr);
+
+      const ensureBucket = (keyArr) => {
+        const key = keyToString(keyArr);
+        if (!byColKey.has(key)) {
+          byColKey.set(key, createCounterBucket());
+        }
+        return byColKey.get(key);
+      };
+
+      for (const rec of filteredRecords) {
+        // COUNTA из ФИО: считаем только записи, где поле ФИО непустое
+        if (countaField && !isCountaValue(rec[countaField])) continue;
+
+        const normalizedStatus = normalizeLabel(rec[statusField]);
+
+        incrementBucket(grandBucket, normalizedStatus);
+
+        if (colFields.length > 0) {
+          const keyArr = getKeyArr(rec);
+          incrementBucket(ensureBucket(keyArr), normalizedStatus);
+        }
+      }
+
+      let orderedBuckets = [];
+
+      if (colFields.length > 0) {
+        const orderedKeys = sortKeyArrays(
+          Array.from(byColKey.keys()).map(k => JSON.parse(k))
+        );
+        orderedBuckets = orderedKeys.map(keyArr => byColKey.get(keyToString(keyArr)) || createCounterBucket());
+        orderedBuckets.push(grandBucket); // Итого
+      } else {
+        orderedBuckets = [grandBucket];
+      }
+
+      const metrics = [
+        {
+          label: '% всех кто зашел',
+          digits: 1,
+          values: orderedBuckets.map(b => safeDiv(b.total - b.registeredInPark, b.total))
+        },
+        {
+          label: '% загрузил паспорт',
+          digits: 2,
+          values: orderedBuckets.map(b => safeDiv(b.passportUploaded, b.total - b.registeredInPark))
+        },
+        {
+          label: '% загрузил ЛМК',
+          digits: 2,
+          values: orderedBuckets.map(b =>
+            safeDiv(
+              b.firstShift + b.lmkUploaded + b.lmkExpiring + b.lmkExpired + b.shiftAssigned,
+              b.total - b.registeredInPark
+            )
+          )
+        },
+        {
+          label: '% готовых к работе',
+          digits: 2,
+          values: orderedBuckets.map(b =>
+            safeDiv(
+              b.total - b.authorized - b.registeredInPark,
+              b.total
+            )
+          )
+        },
+        {
+          label: '% первая смена',
+          digits: 2,
+          values: orderedBuckets.map(b => safeDiv(b.firstShift, b.total))
+        }
+      ];
+
+      return {
+        metrics,
+        colCount: orderedBuckets.length,
+        statusField,
+        countaField,
+        filteredCount: filteredRecords.length
+      };
+    }
+
+    function getMainTableLayoutHints(expectedCols) {
+      let labelWidth = 260;
+      let dataWidths = Array(expectedCols).fill(80);
+
+      const rendererArea = document.querySelector('#output .pvtRendererArea');
+      if (!rendererArea) return { labelWidth, dataWidths };
+
+      const tables = rendererArea.querySelectorAll('.pvtTable');
+      if (!tables.length) return { labelWidth, dataWidths };
+
+      const mainTable = tables[0];
+      const bodyRows = Array.from(mainTable.querySelectorAll('tbody tr'));
+      if (!bodyRows.length) return { labelWidth, dataWidths };
+
+      for (const tr of bodyRows) {
+        const labelCell = [...tr.querySelectorAll('th')].reverse().find(th => normalizeLabel(th.textContent));
+        if (labelCell) {
+          labelWidth = Math.max(labelWidth, labelCell.getBoundingClientRect().width / currentZoom);
+        }
+      }
+
+      let refTds = [];
+      const totalRow = bodyRows.find(tr =>
+        tr.querySelector('th.pvtTotalLabel') ||
+        [...tr.querySelectorAll('th')].some(th => normalizeLabel(th.textContent) === 'ИТОГО')
+      );
+
+      if (totalRow) {
+        refTds = Array.from(totalRow.querySelectorAll('td'));
+      }
+
+      if (!refTds.length) {
+        const firstDataRow = bodyRows.find(tr => tr.querySelectorAll('td').length > 0);
+        if (firstDataRow) {
+          refTds = Array.from(firstDataRow.querySelectorAll('td'));
+        }
+      }
+
+      if (refTds.length) {
+        dataWidths = refTds.map(td => td.getBoundingClientRect().width / currentZoom);
+      }
+
+      if (dataWidths.length < expectedCols) {
+        while (dataWidths.length < expectedCols) {
+          dataWidths.push(dataWidths[dataWidths.length - 1] || 80);
+        }
+      } else if (dataWidths.length > expectedCols) {
+        dataWidths = dataWidths.slice(0, expectedCols);
+      }
+
+      return { labelWidth, dataWidths };
+    }
+
+    function renderSecondFormulaTable() {
+      const rendererArea = document.querySelector('#output .pvtRendererArea');
+      if (!rendererArea) return;
+
+      const old = document.getElementById('secondary-table-wrap');
+      if (old) old.remove();
+
+      const result = buildDerivedMetricsFromRecords(mappedRecords, currentPivotConfig);
+      if (!result) return;
+
+      const { metrics, colCount } = result;
+      const { labelWidth, dataWidths } = getMainTableLayoutHints(colCount);
+
+      const wrap = document.createElement('div');
+      wrap.id = 'secondary-table-wrap';
+
+      const table = document.createElement('table');
+      table.className = 'pvtTable derivedTable';
+
+      const tbody = document.createElement('tbody');
+
+      metrics.forEach(metric => {
+        const tr = document.createElement('tr');
+
+        const validVals = metric.values.filter(v => v != null && Number.isFinite(v));
+        const min = validVals.length ? Math.min(...validVals) : 0;
+        const max = validVals.length ? Math.max(...validVals) : 1;
+
+        const th = document.createElement('th');
+        th.className = 'metric-label pvtRowLabel';
+        th.textContent = metric.label;
+        th.style.width = `${labelWidth}px`;
+        th.style.minWidth = `${labelWidth}px`;
+        th.style.maxWidth = `${labelWidth}px`;
+        tr.appendChild(th);
+
+        metric.values.forEach((val, idx) => {
+          const td = document.createElement('td');
+          td.className = 'metric-val';
+          td.textContent = formatPercentRU(val, metric.digits);
+
+          const w = dataWidths[idx] || 80;
+          td.style.width = `${w}px`;
+          td.style.minWidth = `${w}px`;
+          td.style.maxWidth = `${w}px`;
+
+          if (val == null || !Number.isFinite(val)) {
+            td.classList.add('metric-na');
+          } else {
+            const bg = getHeatColor(val, min, max);
+            td.style.backgroundColor = bg;
+            td.style.color = getTextColorForBg(bg);
+          }
+
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+      rendererArea.appendChild(wrap);
+    }
+
+    function postRenderEnhance() {
+      initIndividualResizing();
+      renderSecondFormulaTable();
+      initIndividualResizing();
+      applyZoom();
+    }
+
     // -----------------------------
-    // FORCE RELOAD (чтобы при переходах не нужен был Restart)
+    // FORCE RELOAD
     // -----------------------------
     async function forceReloadFromGrist(reason = "") {
       if (reloadInFlight) return;
@@ -247,16 +753,13 @@
       }
     }
 
-    // 1) старт
     setTimeout(() => forceReloadFromGrist("startup"), 0);
 
-    // 2) вернулись на страницу
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) setTimeout(() => forceReloadFromGrist("visibilitychange"), 50);
     });
     window.addEventListener("focus", () => setTimeout(() => forceReloadFromGrist("focus"), 50));
 
-    // WATCHDOG (исправленный): НЕ перерисовывает каждые ~20 сек, только если pivot вообще не отрисован
     setInterval(() => {
       if (document.hidden) return;
       const pivotExists = !!document.querySelector('#output .pvtTable');
@@ -323,6 +826,8 @@
         }
 
         const currentRecords = mapRecordsWithLabels(rawRecords);
+        mappedRecords = currentRecords;
+
         const fields = currentRecords.length ? Object.keys(currentRecords[0]) : [];
 
         const key = await getConfigKeyForCurrentTable();
@@ -337,6 +842,10 @@
 
         const ruLocales = $.pivotUtilities.locales.ru;
         const tpl = $.pivotUtilities.aggregators;
+        const intFormatter = $.pivotUtilities.numberFormat({ digitsAfterDecimal: 0 });
+
+        const countaField = findFieldByAliases(fields, COUNTA_FIELD_ALIASES);
+
         const myAggregators = {
           "Количество":            tpl["Count"],
           "Количество уникальных": tpl["Count Unique Values"],
@@ -345,33 +854,68 @@
           "Кол-во по столбцу":     tpl["Count as Fraction of Columns"]
         };
 
+        // Добавляем COUNTA по ФИО как отдельный вариант, но не меняем дефолт
+        if (countaField) {
+          myAggregators[`COUNTA по ${countaField}`] = makeCountaAggregatorForField(countaField, intFormatter);
+        }
+
         const safeConfig = sanitizeConfig(savedConfig, fields);
+
+        let resolvedAggregatorName = safeConfig.aggregatorName || "Количество";
+        if (!myAggregators[resolvedAggregatorName]) {
+          resolvedAggregatorName = "Количество";
+        }
+
+        currentPivotConfig = {
+          rows: safeConfig.rows || [],
+          cols: safeConfig.cols || [],
+          vals: safeConfig.vals || [],
+          inclusions: safeConfig.inclusions || {},
+          exclusions: safeConfig.exclusions || {},
+          rendererName: safeConfig.rendererName || "Таблица",
+          aggregatorName: resolvedAggregatorName
+        };
 
         const options = {
           renderers: ruLocales.renderers,
           aggregators: myAggregators,
 
-          rendererName: safeConfig.rendererName || "Таблица",
-          aggregatorName: safeConfig.aggregatorName || "Количество",
+          rendererName: currentPivotConfig.rendererName,
+          aggregatorName: currentPivotConfig.aggregatorName,
 
-          rows: safeConfig.rows || [],
-          cols: safeConfig.cols || [],
-          vals: safeConfig.vals || [],
+          rows: currentPivotConfig.rows,
+          cols: currentPivotConfig.cols,
+          vals: currentPivotConfig.vals,
 
-          inclusions: safeConfig.inclusions,
-          exclusions: safeConfig.exclusions,
+          inclusions: currentPivotConfig.inclusions,
+          exclusions: currentPivotConfig.exclusions,
 
           unusedAttrsVertical: false,
 
           onRefresh: function (cfg) {
+            let refreshedAggregatorName = cfg.aggregatorName || "Количество";
+            if (!myAggregators[refreshedAggregatorName]) {
+              refreshedAggregatorName = "Количество";
+            }
+
+            currentPivotConfig = {
+              rows: cfg.rows || [],
+              cols: cfg.cols || [],
+              vals: cfg.vals || [],
+              inclusions: cfg.inclusions || {},
+              exclusions: cfg.exclusions || {},
+              rendererName: cfg.rendererName || "Таблица",
+              aggregatorName: refreshedAggregatorName
+            };
+
             const configToSave = {
-              rows: cfg.rows,
-              cols: cfg.cols,
-              vals: cfg.vals,
-              rendererName: cfg.rendererName,
-              aggregatorName: cfg.aggregatorName,
-              inclusions: cfg.inclusions,
-              exclusions: cfg.exclusions,
+              rows: currentPivotConfig.rows,
+              cols: currentPivotConfig.cols,
+              vals: currentPivotConfig.vals,
+              rendererName: currentPivotConfig.rendererName,
+              aggregatorName: currentPivotConfig.aggregatorName,
+              inclusions: currentPivotConfig.inclusions,
+              exclusions: currentPivotConfig.exclusions,
               isViewOnly: isViewOnly,
               zoomLevel: currentZoom
             };
@@ -379,8 +923,7 @@
             grist.setOption(key, configToSave);
 
             setTimeout(() => {
-              initIndividualResizing();
-              applyZoom();
+              postRenderEnhance();
             }, 200);
           }
         };
@@ -388,8 +931,7 @@
         $("#output").empty().pivotUI(currentRecords, options, true);
 
         setTimeout(() => {
-          initIndividualResizing();
-          applyZoom();
+          postRenderEnhance();
         }, 200);
 
       } catch (e) {
@@ -397,7 +939,10 @@
         $('#output').text("Ошибка рендера: " + (e?.message || e));
       } finally {
         renderInProgress = false;
-        if (renderPending) { renderPending = false; scheduleRender(); }
+        if (renderPending) {
+          renderPending = false;
+          scheduleRender();
+        }
       }
     }
 
