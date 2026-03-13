@@ -142,11 +142,14 @@
     .derivedTable td.metric-val {
       text-align: center;
       font-weight: 700;
+      color: #fff;
+      text-shadow: 0 1px 1px rgba(0,0,0,0.18);
     }
 
     .derivedTable td.metric-na {
       background: #f3f3f3 !important;
       color: #999 !important;
+      text-shadow: none !important;
     }
   </style>
 
@@ -370,27 +373,47 @@
       return yiq >= 145 ? '#222' : '#fff';
     }
 
+    // -----------------------------
+    // ПАЛИТРА KPI КАК НА СКРИНЕ
+    // красный -> оранжевый -> жёлтый -> салатовый -> зелёный
+    // -----------------------------
+    const KPI_HEAT_STOPS = [
+      { t: 0.00, color: '#de6b6b' }, // красный
+      { t: 0.25, color: '#e6a05f' }, // оранжевый
+      { t: 0.50, color: '#efd46d' }, // жёлтый
+      { t: 0.75, color: '#a9bf58' }, // салатовый
+      { t: 1.00, color: '#54aa69' }  // зелёный
+    ];
+
+    function interpolateMultiStopColor(stops, t) {
+      const clamped = Math.max(0, Math.min(1, t));
+
+      if (clamped <= stops[0].t) return stops[0].color;
+      if (clamped >= stops[stops.length - 1].t) return stops[stops.length - 1].color;
+
+      for (let i = 0; i < stops.length - 1; i++) {
+        const left = stops[i];
+        const right = stops[i + 1];
+
+        if (clamped >= left.t && clamped <= right.t) {
+          const span = right.t - left.t || 1;
+          const localT = (clamped - left.t) / span;
+          return mixColors(left.color, right.color, localT);
+        }
+      }
+
+      return stops[stops.length - 1].color;
+    }
+
     function getHeatColor(value, min, max) {
       if (value == null || !Number.isFinite(value)) return '#f3f3f3';
+
       if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-        return 'rgb(210, 230, 190)';
+        return interpolateMultiStopColor(KPI_HEAT_STOPS, 0.5);
       }
 
-      const low  = '#e57373';
-      const mid  = '#f6d365';
-      const high = '#6aa84f';
-
-      const midpoint = (min + max) / 2;
-
-      if (value <= midpoint) {
-        const denom = (midpoint - min) || 1;
-        const t = Math.max(0, Math.min(1, (value - min) / denom));
-        return mixColors(low, mid, t);
-      } else {
-        const denom = (max - midpoint) || 1;
-        const t = Math.max(0, Math.min(1, (value - midpoint) / denom));
-        return mixColors(mid, high, t);
-      }
+      const t = (value - min) / (max - min);
+      return interpolateMultiStopColor(KPI_HEAT_STOPS, t);
     }
 
     function findFieldByAliases(fields, aliases) {
@@ -693,14 +716,12 @@
       const expectedCols = firstMetricRow.querySelectorAll('td.metric-val').length;
       const { labelWidth, dataWidths } = getMainTableLayoutHints(expectedCols);
 
-      // Угловая ячейка
       derivedTable.querySelectorAll('th.metric-header-corner, th.metric-label').forEach(th => {
         th.style.width = `${labelWidth}px`;
         th.style.minWidth = `${labelWidth}px`;
         th.style.maxWidth = `${labelWidth}px`;
       });
 
-      // Хедеры колонок
       derivedTable.querySelectorAll('th.metric-col-header').forEach((th, idx) => {
         const w = dataWidths[idx] || 80;
         th.style.width = `${w}px`;
@@ -708,7 +729,6 @@
         th.style.maxWidth = `${w}px`;
       });
 
-      // Данные
       derivedTable.querySelectorAll('tbody tr').forEach(tr => {
         tr.querySelectorAll('td.metric-val').forEach((td, idx) => {
           const w = dataWidths[idx] || 80;
@@ -738,7 +758,6 @@
       const table = document.createElement('table');
       table.className = 'pvtTable derivedTable';
 
-      // THEAD с подписями недель/колонок
       const thead = document.createElement('thead');
       const headTr = document.createElement('tr');
 
@@ -798,7 +817,7 @@
           } else {
             const bg = getHeatColor(val, min, max);
             td.style.backgroundColor = bg;
-            td.style.color = getTextColorForBg(bg);
+            td.style.color = '#fff';
           }
 
           tr.appendChild(td);
@@ -1184,7 +1203,6 @@
           cell.style.maxWidth = `${newW}px`;
           cell.style.minWidth = '30px';
 
-          // только верхняя таблица тянет нижнюю за собой
           syncSecondaryTableWidthsFromMain();
         }
       };
@@ -1196,8 +1214,6 @@
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
 
-        // ВАЖНО:
-        // если тянули нижнюю таблицу — не синкаем обратно, чтобы не было отката
         if (!isDerived) {
           syncSecondaryTableWidthsFromMain();
         }
