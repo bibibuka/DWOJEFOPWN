@@ -9,41 +9,78 @@
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      margin: 0; padding: 0; background-color: white;
+      margin: 0;
+      padding: 0;
+      background-color: white;
     }
 
-    /* --- ТУЛБАР --- */
     #toolbar {
-      padding: 8px 12px; background: #f7f7f7; border-bottom: 1px solid #e0e0e0;
-      display: flex; justify-content: space-between; align-items: center;
-      height: 48px; box-sizing: border-box;
-      position: sticky; top: 0; z-index: 1000;
+      padding: 8px 12px;
+      background: #f7f7f7;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 48px;
+      box-sizing: border-box;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
       gap: 12px;
     }
+
     .toolbar-group {
-      display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #555;
       min-width: 0;
     }
-    input[type=range] { width: 90px; cursor: pointer; }
+
+    input[type=range] {
+      width: 90px;
+      cursor: pointer;
+    }
 
     .global-drag {
-      display: inline-flex; align-items: center; justify-content: center;
-      padding: 0 10px; height: 26px;
-      background: #fff; border: 1px solid #ccc; border-radius: 4px;
-      user-select: none; font-size: 12px; font-weight: 600; color: #333;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.1s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      height: 26px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      user-select: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: background 0.1s;
     }
+
     #drag-all-cols { cursor: ew-resize; }
     #drag-all-rows { cursor: ns-resize; }
+
     .global-drag:hover { background: #f0f0f0; }
     .global-drag:active { background: #e0f0ea; border-color: #169366; }
 
     button#toggle-mode {
-      background-color: #169366; color: white; border: none; padding: 6px 15px;
-      border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;
+      background-color: #169366;
+      color: white;
+      border: none;
+      padding: 6px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
       white-space: nowrap;
     }
-    button#toggle-mode:hover { background-color: #127a55; }
+
+    button#toggle-mode:hover {
+      background-color: #127a55;
+    }
 
     #drill-toolbar {
       display: none;
@@ -51,6 +88,7 @@
       justify-content: center;
       min-width: 0;
     }
+
     #drill-caption {
       color: #444;
       font-size: 13px;
@@ -60,6 +98,7 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
     #drill-back {
       background: #2d6cdf;
       color: white;
@@ -71,11 +110,11 @@
       font-weight: 600;
       white-space: nowrap;
     }
+
     #drill-back:hover {
       background: #2157b6;
     }
 
-    /* --- КОНТЕЙНЕР --- */
     #output {
       padding: 20px;
       overflow: auto;
@@ -84,7 +123,6 @@
       box-sizing: border-box;
     }
 
-    /* --- ТАБЛИЦА --- */
     .pvtTable {
       font-size: 13px;
       border-collapse: collapse;
@@ -96,7 +134,8 @@
       transform-origin: top left;
     }
 
-    .pvtTable th, .pvtTable td {
+    .pvtTable th,
+    .pvtTable td {
       border: 1px solid #ccc;
       padding: 5px 8px;
       overflow: hidden;
@@ -109,39 +148,79 @@
       max-width: none;
     }
 
-    .pvtTable th { background-color: #f2f2f2; font-weight: 600; }
-
-    /* --- ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ --- */
-    .resizer-col {
-      position: absolute; top: 0; right: 0; width: 6px; cursor: col-resize;
-      z-index: 20; user-select: none; height: 100%;
+    .pvtTable th {
+      background-color: #f2f2f2;
+      font-weight: 600;
     }
-    .resizer-col:hover { border-right: 2px solid #169366; }
+
+    .resizer-col {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 6px;
+      cursor: col-resize;
+      z-index: 20;
+      user-select: none;
+      height: 100%;
+    }
+
+    .resizer-col:hover {
+      border-right: 2px solid #169366;
+    }
 
     .resizer-row {
-      position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; cursor: row-resize;
-      z-index: 20; user-select: none;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      cursor: row-resize;
+      z-index: 20;
+      user-select: none;
     }
-    .resizer-row:hover { border-bottom: 2px solid #169366; }
 
-    /* --- CLEAN MODE --- */
-    .clean-mode .pvtAxisContainer, .clean-mode .pvtRenderer,
-    .clean-mode .pvtAggregator, .clean-mode .pvtAttrDropdown,
-    .clean-mode .pvtTriangle, .clean-mode .ui-icon,
+    .resizer-row:hover {
+      border-bottom: 2px solid #169366;
+    }
+
+    .clean-mode .pvtAxisContainer,
+    .clean-mode .pvtRenderer,
+    .clean-mode .pvtAggregator,
+    .clean-mode .pvtAttrDropdown,
+    .clean-mode .pvtTriangle,
+    .clean-mode .ui-icon,
     .clean-mode .pvtTopLeft,
     .clean-mode thead tr:first-child > th.pvtAxisContainer,
     .clean-mode thead tr:first-child > th.pvtTopLeft {
       display: none !important;
     }
-    .clean-mode table.pvtUi { display: block; padding: 0; margin: 0; }
-    .clean-mode td.pvtRendererArea { padding: 0 !important; border: none !important; }
-    .clean-mode .pvtTable th { cursor: default; background-image: none !important; }
 
-    /* FIX: горизонтальный список полей */
-    #output .pvtHorizList li { display: inline-block !important; float: none !important; }
-    #output .pvtAxisContainer ul.pvtAttrList { padding-left: 0 !important; margin: 0 !important; }
+    .clean-mode table.pvtUi {
+      display: block;
+      padding: 0;
+      margin: 0;
+    }
 
-    /* --- ВТОРАЯ KPI-ТАБЛИЦА --- */
+    .clean-mode td.pvtRendererArea {
+      padding: 0 !important;
+      border: none !important;
+    }
+
+    .clean-mode .pvtTable th {
+      cursor: default;
+      background-image: none !important;
+    }
+
+    #output .pvtHorizList li {
+      display: inline-block !important;
+      float: none !important;
+    }
+
+    #output .pvtAxisContainer ul.pvtAttrList {
+      padding-left: 0 !important;
+      margin: 0 !important;
+    }
+
     #secondary-table-wrap {
       margin-top: 24px;
       width: max-content;
@@ -200,7 +279,9 @@
       user-select: none;
       vertical-align: middle;
       border: 1px solid #c7dafd;
+      flex: 0 0 auto;
     }
+
     .week-drill-toggle:hover {
       background: #d6e7ff;
     }
@@ -253,11 +334,9 @@
   <div id="output">Загрузка...</div>
 
   <script>
-    // -----------------------------
-    // СОСТОЯНИЕ
-    // -----------------------------
     let rawRecords = [];
     let mappedRecords = [];
+    let displayedRecords = [];
     let columnLabels = {};
     let currentTableId = null;
 
@@ -270,7 +349,6 @@
     let reloadInFlight = false;
     let lastDataStamp = 0;
 
-    // base config (пользовательский)
     let currentPivotConfig = {
       rows: [],
       cols: [],
@@ -281,7 +359,6 @@
       aggregatorName: "Количество"
     };
 
-    // effective config (то, что реально показано после drill-down)
     let currentDisplayedConfig = {
       rows: [],
       cols: [],
@@ -304,33 +381,10 @@
 
     grist.ready({ requiredAccess: 'full' });
 
-    // -----------------------------
-    // КОНСТАНТЫ ДЛЯ KPI / COUNTA / DRILL
-    // -----------------------------
-    const STATUS_FIELD_ALIASES = [
-      'СТАТУС ВОРОНКИ',
-      'СТАТУС',
-      'ЭТАП ВОРОНКИ'
-    ];
-
-    const COUNTA_FIELD_ALIASES = [
-      'ФИО',
-      'FIO',
-      'ФИО КАНДИДАТА',
-      'КАНДИДАТ',
-      'СОТРУДНИК'
-    ];
-
-    const WEEK_FIELD_ALIASES = [
-      'НЕДЕЛЯ',
-      'WEEK'
-    ];
-
-    const DATE_FIELD_ALIASES = [
-      'ДАТА',
-      'DATE',
-      'ДЕНЬ'
-    ];
+    const STATUS_FIELD_ALIASES = ['СТАТУС ВОРОНКИ', 'СТАТУС', 'ЭТАП ВОРОНКИ'];
+    const COUNTA_FIELD_ALIASES = ['ФИО', 'FIO', 'ФИО КАНДИДАТА', 'КАНДИДАТ', 'СОТРУДНИК'];
+    const WEEK_FIELD_ALIASES = ['НЕДЕЛЯ', 'WEEK'];
+    const DATE_FIELD_ALIASES = ['ДАТА', 'DATE', 'ДЕНЬ'];
 
     const STATUS_ALIASES = {
       authorized:       ['АВТОРИЗОВАЛСЯ'],
@@ -347,9 +401,6 @@
       Object.entries(STATUS_ALIASES).map(([k, arr]) => [k, new Set(arr.map(normalizeLabel))])
     );
 
-    // -----------------------------
-    // HELPERS
-    // -----------------------------
     async function getTableIdSafe() {
       try { return await grist.getTable().getTableId(); }
       catch (e) { console.warn("Не удалось получить tableId", e); return null; }
@@ -421,7 +472,6 @@
     async function ensureTableContextUpToDate() {
       const tableId = await getTableIdSafe();
       if (!tableId) return;
-
       if (currentTableId !== tableId) {
         currentTableId = tableId;
         await loadColumnLabelsForCurrentTable();
@@ -492,7 +542,6 @@
       const low  = '#e57373';
       const mid  = '#f6d365';
       const high = '#6aa84f';
-
       const midpoint = (min + max) / 2;
 
       if (value <= midpoint) {
@@ -550,7 +599,6 @@
       for (const [field, allowed] of Object.entries(inclusions)) {
         const allowedSet = collectionToComparableSet(allowed);
         if (!allowedSet.size) continue;
-
         const recVal = normalizeComparableValue(record[field]);
         if (!allowedSet.has(recVal)) return false;
       }
@@ -558,7 +606,6 @@
       for (const [field, blocked] of Object.entries(exclusions)) {
         const blockedSet = collectionToComparableSet(blocked);
         if (!blockedSet.size) continue;
-
         const recVal = normalizeComparableValue(record[field]);
         if (blockedSet.has(recVal)) return false;
       }
@@ -595,15 +642,13 @@
 
     function makeCountaAggregatorForField(fieldName, formatter) {
       return function() {
-        return function(data, rowKey, colKey) {
+        return function() {
           let count = 0;
           return {
             push(record) {
               if (isCountaValue(record[fieldName])) count++;
             },
-            value() {
-              return count;
-            },
+            value() { return count; },
             format: formatter || (x => String(x)),
             numInputs: 0
           };
@@ -627,7 +672,6 @@
 
     function incrementBucket(bucket, normalizedStatus) {
       bucket.total += 1;
-
       if (STATUS_ALIAS_SETS.authorized.has(normalizedStatus))       bucket.authorized += 1;
       if (STATUS_ALIAS_SETS.firstShift.has(normalizedStatus))       bucket.firstShift += 1;
       if (STATUS_ALIAS_SETS.lmkUploaded.has(normalizedStatus))      bucket.lmkUploaded += 1;
@@ -638,14 +682,11 @@
       if (STATUS_ALIAS_SETS.shiftAssigned.has(normalizedStatus))    bucket.shiftAssigned += 1;
     }
 
-    // -----------------------------
-    // DRILL-DOWN
-    // -----------------------------
     function getWeekDrillCapability(fields, baseConfig) {
       const weekField = findFieldByAliases(fields, WEEK_FIELD_ALIASES);
       const dateField = findFieldByAliases(fields, DATE_FIELD_ALIASES);
-
       const cols = Array.isArray(baseConfig?.cols) ? baseConfig.cols : [];
+
       const onlyWeekInCols =
         !!weekField &&
         cols.length === 1 &&
@@ -660,24 +701,29 @@
 
     function buildEffectivePivotConfig(baseConfig, fields) {
       const effective = deepClone(baseConfig);
+      if (!drillState.active) return effective;
 
-      if (!drillState.active) {
-        return effective;
-      }
-
-      const { weekField, dateField } = getWeekDrillCapability(fields, baseConfig);
-
-      if (!weekField || !dateField) {
+      const cap = getWeekDrillCapability(fields, baseConfig);
+      if (!cap.canDrill) {
         drillState.active = false;
         updateDrillUi();
         return effective;
       }
 
-      effective.cols = [dateField];
-      effective.inclusions = deepClone(effective.inclusions || {});
-      effective.inclusions[weekField] = [drillState.weekValue];
-
+      effective.cols = [cap.dateField];
+      effective.rows = (effective.rows || []).filter(f => normalizeLabel(f) !== normalizeLabel(cap.weekField));
       return effective;
+    }
+
+    function getDisplayedRecordsForCurrentView(records, fields, baseConfig) {
+      let out = records || [];
+      if (!drillState.active) return out;
+
+      const cap = getWeekDrillCapability(fields, baseConfig);
+      if (!cap.canDrill) return out;
+
+      const target = normalizeComparableValue(drillState.weekValue);
+      return out.filter(rec => normalizeComparableValue(rec[cap.weekField]) === target);
     }
 
     function openWeekDrill(weekValue, weekLabel) {
@@ -724,9 +770,6 @@
 
     document.getElementById('drill-back').addEventListener('click', resetDrill);
 
-    // -----------------------------
-    // KPI BUILD
-    // -----------------------------
     function buildDerivedMetricsFromRecords(records, config) {
       if (!records || !records.length) return null;
 
@@ -735,10 +778,7 @@
       if (!statusField) return null;
 
       const countaField = findFieldByAliases(fields, COUNTA_FIELD_ALIASES);
-
-      const colFields = Array.isArray(config?.cols)
-        ? config.cols.filter(f => fields.includes(f))
-        : [];
+      const colFields = Array.isArray(config?.cols) ? config.cols.filter(f => fields.includes(f)) : [];
 
       const filteredRecords = records.filter(rec => recordMatchesPivotFilters(rec, config));
 
@@ -758,7 +798,6 @@
         if (countaField && !isCountaValue(rec[countaField])) continue;
 
         const normalizedStatus = normalizeLabel(rec[statusField]);
-
         incrementBucket(grandBucket, normalizedStatus);
 
         if (colFields.length > 0) {
@@ -814,10 +853,7 @@
           label: '% готовых к работе',
           digits: 2,
           values: orderedBuckets.map(b =>
-            safeDiv(
-              b.total - b.authorized - b.registeredInPark,
-              b.total
-            )
+            safeDiv(b.total - b.authorized - b.registeredInPark, b.total)
           )
         },
         {
@@ -835,9 +871,6 @@
       };
     }
 
-    // -----------------------------
-    // LAYOUT / WIDTHS
-    // -----------------------------
     function getMainTableLayoutHints(expectedCols) {
       let labelWidth = 260;
       let dataWidths = Array(expectedCols).fill(80);
@@ -870,9 +903,7 @@
 
       if (!refTds.length) {
         const firstDataRow = bodyRows.find(tr => tr.querySelectorAll('td').length > 0);
-        if (firstDataRow) {
-          refTds = Array.from(firstDataRow.querySelectorAll('td'));
-        }
+        if (firstDataRow) refTds = Array.from(firstDataRow.querySelectorAll('td'));
       }
 
       if (refTds.length) {
@@ -926,12 +957,16 @@
       });
     }
 
-    // -----------------------------
-    // DRILL DECORATION
-    // -----------------------------
     function decorateMainWeekHeadersForDrill() {
       const mainTable = document.querySelector('#output .pvtRendererArea .pvtTable:not(.derivedTable)');
       if (!mainTable) return;
+
+      const allColHeaders = Array.from(mainTable.querySelectorAll('thead th.pvtColLabel'));
+      allColHeaders.forEach(th => {
+        if (th.dataset.originalLabel) {
+          th.textContent = th.dataset.originalLabel;
+        }
+      });
 
       mainTable.querySelectorAll('.week-drill-toggle').forEach(el => el.remove());
 
@@ -943,46 +978,47 @@
       const cap = getWeekDrillCapability(fields, currentPivotConfig);
       if (!cap.canDrill) return;
 
-      const headerRows = Array.from(mainTable.querySelectorAll('thead tr'));
-      if (!headerRows.length) return;
+      const weekCols = lastDerivedRenderMeta.colLabels
+        .map((label, i) => ({ label, key: lastDerivedRenderMeta.colKeys[i] }))
+        .filter(item => item.label !== 'Итого' && Array.isArray(item.key) && item.key.length);
 
-      const bottomRow = headerRows[headerRows.length - 1];
-      const leafHeaders = Array.from(bottomRow.querySelectorAll('th.pvtColLabel, th.pvtTotalLabel'));
-      if (!leafHeaders.length) return;
+      const headers = Array.from(mainTable.querySelectorAll('thead th.pvtColLabel'));
+      let weekIndex = 0;
 
-      let idx = 0;
-      leafHeaders.forEach(th => {
-        const metaLabel = lastDerivedRenderMeta.colLabels[idx];
-        const metaKey = lastDerivedRenderMeta.colKeys[idx];
+      headers.forEach(th => {
+        const currentText = (th.dataset.originalLabel || th.textContent || '').trim();
+        const norm = normalizeLabel(currentText);
+        if (norm === 'ИТОГО') return;
 
-        if (!metaLabel) {
-          idx++;
-          return;
-        }
+        const meta = weekCols[weekIndex++];
+        if (!meta) return;
 
-        if (metaLabel !== 'Итого' && Array.isArray(metaKey) && metaKey.length > 0) {
-          const weekValue = metaKey[0];
+        th.dataset.originalLabel = currentText || meta.label;
+        th.textContent = '';
 
-          const btn = document.createElement('span');
-          btn.className = 'week-drill-toggle';
-          btn.textContent = '▸';
-          btn.title = `Открыть дни недели ${metaLabel}`;
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            openWeekDrill(weekValue, metaLabel);
-          });
+        const wrapEl = document.createElement('span');
+        wrapEl.className = 'header-label-wrap';
 
-          th.insertBefore(btn, th.firstChild);
-        }
+        const btn = document.createElement('span');
+        btn.className = 'week-drill-toggle';
+        btn.textContent = '▸';
+        btn.title = `Открыть дни недели ${meta.label}`;
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openWeekDrill(meta.key[0], meta.label);
+        });
 
-        idx++;
+        const textSpan = document.createElement('span');
+        textSpan.className = 'header-label-text';
+        textSpan.textContent = currentText || meta.label;
+
+        wrapEl.appendChild(btn);
+        wrapEl.appendChild(textSpan);
+        th.appendChild(wrapEl);
       });
     }
 
-    // -----------------------------
-    // SECOND TABLE RENDER
-    // -----------------------------
     function renderSecondFormulaTable() {
       const rendererArea = document.querySelector('#output .pvtRendererArea');
       if (!rendererArea) return;
@@ -992,17 +1028,13 @@
 
       lastDerivedRenderMeta = null;
 
-      const result = buildDerivedMetricsFromRecords(mappedRecords, currentDisplayedConfig);
+      const result = buildDerivedMetricsFromRecords(displayedRecords, currentDisplayedConfig);
       if (!result) return;
 
       lastDerivedRenderMeta = result;
 
-      const { metrics, colCount, colLabels, colKeys } = result;
+      const { metrics, colCount, colLabels } = result;
       const { labelWidth, dataWidths } = getMainTableLayoutHints(colCount);
-
-      const fields = mappedRecords.length ? Object.keys(mappedRecords[0]) : [];
-      const drillCap = getWeekDrillCapability(fields, currentPivotConfig);
-      const canDrillNow = drillCap.canDrill && !drillState.active;
 
       const wrap = document.createElement('div');
       wrap.id = 'secondary-table-wrap';
@@ -1024,34 +1056,13 @@
       colLabels.forEach((label, idx) => {
         const th = document.createElement('th');
         th.className = 'metric-col-header pvtColLabel';
+        th.textContent = label;
 
         const w = dataWidths[idx] || 80;
         th.style.width = `${w}px`;
         th.style.minWidth = `${w}px`;
         th.style.maxWidth = `${w}px`;
 
-        const wrapEl = document.createElement('span');
-        wrapEl.className = 'header-label-wrap';
-
-        if (canDrillNow && label !== 'Итого' && Array.isArray(colKeys[idx]) && colKeys[idx].length > 0) {
-          const btn = document.createElement('span');
-          btn.className = 'week-drill-toggle';
-          btn.textContent = '▸';
-          btn.title = `Открыть дни недели ${label}`;
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            openWeekDrill(colKeys[idx][0], label);
-          });
-          wrapEl.appendChild(btn);
-        }
-
-        const textSpan = document.createElement('span');
-        textSpan.className = 'header-label-text';
-        textSpan.textContent = label;
-        wrapEl.appendChild(textSpan);
-
-        th.appendChild(wrapEl);
         headTr.appendChild(th);
       });
 
@@ -1114,9 +1125,6 @@
       updateDrillUi();
     }
 
-    // -----------------------------
-    // FORCE RELOAD
-    // -----------------------------
     async function forceReloadFromGrist(reason = "") {
       if (reloadInFlight) return;
       reloadInFlight = true;
@@ -1137,6 +1145,7 @@
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) setTimeout(() => forceReloadFromGrist("visibilitychange"), 50);
     });
+
     window.addEventListener("focus", () => setTimeout(() => forceReloadFromGrist("focus"), 50));
 
     setInterval(() => {
@@ -1145,9 +1154,6 @@
       if (!pivotExists) forceReloadFromGrist("watchdog_missing_pivot");
     }, 5000);
 
-    // -----------------------------
-    // ЗУМ
-    // -----------------------------
     $('#zoom-slider').on('input', async function () {
       currentZoom = parseFloat($(this).val());
       applyZoom();
@@ -1163,9 +1169,6 @@
       $('.pvtTable').css('zoom', currentZoom);
     }
 
-    // -----------------------------
-    // РЕЖИМ "НАСТРОЙКИ/ЧИСТО"
-    // -----------------------------
     async function toggleMode() {
       isViewOnly = !isViewOnly;
       updateViewMode();
@@ -1191,9 +1194,6 @@
       }
     }
 
-    // -----------------------------
-    // RENDER PIVOT
-    // -----------------------------
     async function renderPivot() {
       renderInProgress = true;
       try {
@@ -1217,6 +1217,7 @@
           currentZoom = savedConfig.zoomLevel;
           $('#zoom-slider').val(currentZoom);
         }
+
         updateViewMode();
 
         const ruLocales = $.pivotUtilities.locales.ru;
@@ -1255,6 +1256,7 @@
         };
 
         currentDisplayedConfig = buildEffectivePivotConfig(currentPivotConfig, fields);
+        displayedRecords = getDisplayedRecordsForCurrentView(currentRecords, fields, currentPivotConfig);
 
         const options = {
           renderers: ruLocales.renderers,
@@ -1278,8 +1280,8 @@
               refreshedAggregatorName = "Количество";
             }
 
-            if (drillState.active) {
-              currentDisplayedConfig = {
+            if (!drillState.active) {
+              currentPivotConfig = {
                 rows: cfg.rows || [],
                 cols: cfg.cols || [],
                 vals: cfg.vals || [],
@@ -1287,25 +1289,14 @@
                 exclusions: cfg.exclusions || {},
                 rendererName: cfg.rendererName || "Таблица",
                 aggregatorName: refreshedAggregatorName
-              };
-
-              // В drill-режиме не перезаписываем базовую структуру rows/cols.
-              currentPivotConfig = {
-                ...currentPivotConfig,
-                rendererName: currentDisplayedConfig.rendererName,
-                aggregatorName: currentDisplayedConfig.aggregatorName
               };
             } else {
               currentPivotConfig = {
-                rows: cfg.rows || [],
-                cols: cfg.cols || [],
-                vals: cfg.vals || [],
-                inclusions: cfg.inclusions || {},
-                exclusions: cfg.exclusions || {},
-                rendererName: cfg.rendererName || "Таблица",
-                aggregatorName: refreshedAggregatorName
+                ...currentPivotConfig,
+                rendererName: cfg.rendererName || currentPivotConfig.rendererName,
+                aggregatorName: refreshedAggregatorName,
+                vals: cfg.vals || currentPivotConfig.vals
               };
-              currentDisplayedConfig = deepClone(currentPivotConfig);
             }
 
             const configToSave = {
@@ -1328,7 +1319,7 @@
           }
         };
 
-        $("#output").empty().pivotUI(currentRecords, options, true);
+        $("#output").empty().pivotUI(displayedRecords, options, true);
 
         setTimeout(() => {
           postRenderEnhance();
@@ -1346,18 +1337,12 @@
       }
     }
 
-    // -----------------------------
-    // GRIST: подписка на записи
-    // -----------------------------
     grist.onRecords(function (records) {
       rawRecords = records || [];
       lastDataStamp = Date.now();
       scheduleRender();
     }, { format: "rows", includeColumns: "normal" });
 
-    // -----------------------------
-    // 1) ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ
-    // -----------------------------
     function setupGlobalResizers() {
       const dragCols = document.getElementById('drag-all-cols');
       const dragRows = document.getElementById('drag-all-rows');
@@ -1426,9 +1411,6 @@
     }
     setupGlobalResizers();
 
-    // -----------------------------
-    // 2) ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ
-    // -----------------------------
     function initIndividualResizing() {
       const headers = document.querySelectorAll('.pvtTable th');
       headers.forEach(th => {
@@ -1487,7 +1469,6 @@
 
         if (isDerived && table) {
           const cellIndex = cell.cellIndex;
-
           table.querySelectorAll('tr').forEach(tr => {
             const targetCell = tr.children[cellIndex];
             if (!targetCell) return;
@@ -1499,7 +1480,6 @@
           cell.style.width = `${newW}px`;
           cell.style.maxWidth = `${newW}px`;
           cell.style.minWidth = '30px';
-
           syncSecondaryTableWidthsFromMain();
         }
       };
@@ -1510,10 +1490,7 @@
         resizer.style.borderRight = '';
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-
-        if (!isDerived) {
-          syncSecondaryTableWidthsFromMain();
-        }
+        if (!isDerived) syncSecondaryTableWidthsFromMain();
       };
 
       resizer.addEventListener('mousedown', onMouseDown);
