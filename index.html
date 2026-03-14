@@ -9,7 +9,9 @@
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      margin: 0; padding: 0; background-color: white;
+      margin: 0;
+      padding: 0;
+      background-color: white;
     }
 
     /* --- ТУЛБАР --- */
@@ -88,7 +90,7 @@
       box-sizing: border-box;
     }
 
-    /* --- ТАБЛИЦА --- */
+    /* --- ТАБЛИЦЫ --- */
     .pvtTable {
       font-size: 13px;
       border-collapse: collapse;
@@ -130,9 +132,7 @@
       height: 100%;
     }
 
-    .resizer-col:hover {
-      border-right: 2px solid #169366;
-    }
+    .resizer-col:hover { border-right: 2px solid #169366; }
 
     .resizer-row {
       position: absolute;
@@ -145,9 +145,7 @@
       user-select: none;
     }
 
-    .resizer-row:hover {
-      border-bottom: 2px solid #169366;
-    }
+    .resizer-row:hover { border-bottom: 2px solid #169366; }
 
     /* --- CLEAN MODE --- */
     .clean-mode .pvtAxisContainer,
@@ -178,7 +176,6 @@
       background-image: none !important;
     }
 
-    /* FIX: горизонтальный список полей */
     #output .pvtHorizList li {
       display: inline-block !important;
       float: none !important;
@@ -189,7 +186,7 @@
       margin: 0 !important;
     }
 
-    /* --- ВТОРАЯ KPI-ТАБЛИЦА --- */
+    /* --- KPI ТАБЛИЦА --- */
     #secondary-table-wrap {
       margin-top: 24px;
       width: max-content;
@@ -294,23 +291,24 @@
       display: none !important;
     }
 
-    .metric-col-header-inner {
+    /* --- СТРЕЛКИ В ВЕРХНЕЙ PIVOT-ТАБЛИЦЕ --- */
+    .pivot-col-header-inner {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
       gap: 6px;
-      width: 100%;
+      max-width: 100%;
       min-width: 0;
+      vertical-align: middle;
     }
 
-    .metric-col-header-text {
+    .pivot-col-header-text {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .metric-detail-btn {
+    .pivot-drill-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -319,154 +317,75 @@
       border: 1px solid #c9d3e2;
       border-radius: 4px;
       background: #fff;
-      color: #5c6f91;
+      color: #556987;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1;
       padding: 0;
       flex: 0 0 auto;
     }
 
-    .metric-detail-btn:hover {
-      background: #edf3fb;
+    .pivot-drill-btn:hover {
+      background: #eef4fb;
       border-color: #9fb4d3;
-      color: #34507e;
+      color: #304e7a;
     }
 
-    .metric-detail-btn:active {
+    .pivot-drill-btn:active {
       background: #e2edf9;
     }
 
-    /* --- POPUP ДЕТАЛИЗАЦИИ ПО ДАТАМ --- */
-    .metric-detail-popover {
-      position: fixed;
-      z-index: 5000;
-      background: #fff;
-      border: 1px solid #d8dee8;
-      border-radius: 10px;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.16);
-      min-width: 520px;
-      max-width: min(92vw, 1200px);
-      max-height: 82vh;
-      overflow: auto;
-    }
-
-    .metric-detail-popover-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 14px;
-      border-bottom: 1px solid #e6ebf2;
-      position: sticky;
-      top: 0;
-      background: #fff;
-      z-index: 2;
-    }
-
-    .metric-detail-popover-title-wrap {
-      min-width: 0;
-    }
-
-    .metric-detail-popover-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: #22324d;
-      margin: 0 0 2px 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .metric-detail-popover-subtitle {
-      font-size: 12px;
-      color: #66758f;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .metric-detail-popover-close {
-      border: 1px solid #d6dbe5;
-      background: #fff;
-      color: #66758f;
-      border-radius: 6px;
-      width: 28px;
-      height: 28px;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
-      flex: 0 0 auto;
-    }
-
-    .metric-detail-popover-close:hover {
-      background: #f4f7fb;
-    }
-
-    .metric-detail-popover-body {
-      padding: 12px 14px 14px;
-    }
-
-    .metric-detail-table {
-      border-collapse: collapse;
+    /* --- ЭКРАН ДЕТАЛИЗАЦИИ НЕДЕЛИ --- */
+    #detail-view-root {
       width: max-content;
       min-width: 100%;
-      table-layout: fixed;
-      font-size: 12px;
     }
 
-    .metric-detail-table th,
-    .metric-detail-table td {
-      border: 1px solid #d7dde7;
-      padding: 6px 8px;
-      white-space: nowrap;
-      text-align: center;
-      box-sizing: border-box;
+    #detail-backbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
     }
 
-    .metric-detail-table th.detail-row-label {
-      background: #93a7c7;
-      color: #fff;
-      text-align: left;
-      font-weight: 700;
-      min-width: 220px;
-      position: sticky;
-      left: 0;
-      z-index: 1;
-    }
-
-    .metric-detail-table th.detail-corner {
-      background: #93a7c7;
-      color: #fff;
-      text-align: center;
-      font-weight: 700;
-      position: sticky;
-      left: 0;
-      z-index: 2;
-    }
-
-    .metric-detail-table th.detail-col-header {
-      background: #f3f6fb;
-      color: #24334e;
-      font-weight: 700;
-    }
-
-    .metric-detail-table td.detail-val {
-      font-weight: 700;
-      color: #fff;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.18);
-    }
-
-    .metric-detail-table td.detail-na {
-      background: #f3f3f3 !important;
-      color: #999 !important;
-      text-shadow: none !important;
-    }
-
-    .metric-detail-empty {
-      color: #61718d;
+    #detail-back-btn {
+      background: #fff;
+      color: #304e7a;
+      border: 1px solid #c9d3e2;
+      border-radius: 6px;
+      padding: 7px 12px;
+      cursor: pointer;
       font-size: 13px;
-      padding: 10px 0 4px;
+      font-weight: 600;
+    }
+
+    #detail-back-btn:hover {
+      background: #eef4fb;
+      border-color: #9fb4d3;
+    }
+
+    #detail-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #30425e;
+    }
+
+    #detail-subtitle {
+      font-size: 12px;
+      color: #6a7891;
+    }
+
+    .detail-title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .detail-empty-msg {
+      margin-top: 12px;
+      color: #6a7891;
+      font-size: 13px;
     }
   </style>
 
@@ -515,6 +434,9 @@
     let lastDataStamp = 0;
 
     let currentMetricTargets = {};
+    let currentDerivedResult = null;
+
+    let currentDrilldown = null;
 
     let currentPivotConfig = {
       rows: [],
@@ -526,15 +448,10 @@
       aggregatorName: "Количество"
     };
 
-    let currentDerivedResult = null;
-
-    let detailPopoverEl = null;
-    let detailPopoverCleanup = [];
-
     grist.ready({ requiredAccess: 'full' });
 
     // -----------------------------
-    // КОНСТАНТЫ ДЛЯ KPI / COUNTA
+    // КОНСТАНТЫ
     // -----------------------------
     const STATUS_FIELD_ALIASES = [
       'СТАТУС ВОРОНКИ',
@@ -579,11 +496,11 @@
     );
 
     const DEFAULT_METRIC_TARGETS = {
-      allEntered:        0.39,
-      passportUploaded:  0.40,
-      lmkUploaded:       0.18,
-      readyToWork:       0.23,
-      firstShift:        0.03
+      allEntered:       0.39,
+      passportUploaded: 0.40,
+      lmkUploaded:      0.18,
+      readyToWork:      0.23,
+      firstShift:       0.03
     };
 
     // -----------------------------
@@ -619,36 +536,29 @@
           result[key] = num;
         }
       });
-
       return result;
     }
 
     function getMetricTarget(metricKey) {
       const val = currentMetricTargets?.[metricKey];
       if (Number.isFinite(val) && val >= 0) return val;
-
-      const def = DEFAULT_METRIC_TARGETS?.[metricKey];
-      return Number.isFinite(def) ? def : null;
+      return DEFAULT_METRIC_TARGETS?.[metricKey] ?? null;
     }
 
     function formatTargetInputValue(value) {
       if (value == null || !Number.isFinite(value)) return '';
       const pct = value * 100;
-
       let digits = 1;
       if (Math.abs(pct - Math.round(pct)) < 1e-9) digits = 0;
       if (pct > 0 && pct < 10 && Math.abs(pct * 10 - Math.round(pct * 10)) > 1e-9) digits = 2;
-
       return pct.toFixed(digits).replace('.', ',');
     }
 
     function parseTargetInputValue(raw) {
       const txt = String(raw ?? '').trim();
       if (!txt) return null;
-
       const normalized = txt.replace(/\s+/g, '').replace(',', '.');
       const num = Number(normalized);
-
       if (!Number.isFinite(num) || num < 0) return null;
       return num / 100;
     }
@@ -670,77 +580,7 @@
       inputEl.value = formatTargetInputValue(currentMetricTargets[metricKey]);
 
       await saveMetricTargetsToOptions();
-      rerenderKpiTableOnly();
-    }
-
-    function rerenderKpiTableOnly() {
-      closeDetailPopover();
-      renderSecondFormulaTable();
-      syncSecondaryTableWidthsFromMain();
-      initIndividualResizing();
-      applyZoom();
-    }
-
-    function mapRecordsWithLabels(records) {
-      return (records || []).map(rec => {
-        const cleanRow = {};
-        Object.keys(rec).forEach(key => {
-          if (key === 'id' || key === 'manualSort') return;
-          const label = columnLabels[key] || key;
-          cleanRow[label] = rec[key];
-        });
-        return cleanRow;
-      });
-    }
-
-    async function loadColumnLabelsForCurrentTable() {
-      columnLabels = {};
-      try {
-        const tableId = await getTableIdSafe();
-        if (!tableId) return;
-
-        const tables = await grist.docApi.fetchTable('_grist_Tables');
-        const nT = (tables.tableId || []).length;
-
-        let tableRef = null;
-        for (let i = 0; i < nT; i++) {
-          if (tables.tableId[i] === tableId) {
-            tableRef = tables.id[i];
-            break;
-          }
-        }
-        if (!tableRef) return;
-
-        const cols = await grist.docApi.fetchTable('_grist_Tables_column');
-        const nC = (cols.colId || []).length;
-
-        for (let i = 0; i < nC; i++) {
-          if (cols.parentId?.[i] !== tableRef) continue;
-          const colId = cols.colId[i];
-          const label = cols.label?.[i] || colId;
-          if (colId) columnLabels[colId] = label;
-        }
-      } catch (e) {
-        console.warn("Не удалось загрузить labels (будут colId)", e);
-      }
-    }
-
-    async function ensureTableContextUpToDate() {
-      const tableId = await getTableIdSafe();
-      if (!tableId) return;
-
-      if (currentTableId !== tableId) {
-        currentTableId = tableId;
-        await loadColumnLabelsForCurrentTable();
-      }
-    }
-
-    function scheduleRender() {
-      if (renderInProgress) {
-        renderPending = true;
-        return;
-      }
-      renderPivot();
+      scheduleRender();
     }
 
     function normalizeLabel(v) {
@@ -782,50 +622,66 @@
       return `rgb(${lerp(a.r, b.r)}, ${lerp(a.g, b.g)}, ${lerp(a.b, b.b)})`;
     }
 
-    // -----------------------------
-    // ПАЛИТРА KPI
-    // красный -> оранжевый -> жёлтый -> салатовый -> зелёный
-    // -----------------------------
-    const KPI_HEAT_STOPS = [
-      { t: 0.00, color: '#de6b6b' },
-      { t: 0.25, color: '#e6a05f' },
-      { t: 0.50, color: '#efd46d' },
-      { t: 0.75, color: '#a9bf58' },
-      { t: 1.00, color: '#54aa69' }
-    ];
+    async function loadColumnLabelsForCurrentTable() {
+      columnLabels = {};
+      try {
+        const tableId = await getTableIdSafe();
+        if (!tableId) return;
 
-    function interpolateMultiStopColor(stops, t) {
-      const clamped = Math.max(0, Math.min(1, t));
+        const tables = await grist.docApi.fetchTable('_grist_Tables');
+        const nT = (tables.tableId || []).length;
 
-      if (clamped <= stops[0].t) return stops[0].color;
-      if (clamped >= stops[stops.length - 1].t) return stops[stops.length - 1].color;
-
-      for (let i = 0; i < stops.length - 1; i++) {
-        const left = stops[i];
-        const right = stops[i + 1];
-
-        if (clamped >= left.t && clamped <= right.t) {
-          const span = right.t - left.t || 1;
-          const localT = (clamped - left.t) / span;
-          return mixColors(left.color, right.color, localT);
+        let tableRef = null;
+        for (let i = 0; i < nT; i++) {
+          if (tables.tableId[i] === tableId) {
+            tableRef = tables.id[i];
+            break;
+          }
         }
-      }
+        if (!tableRef) return;
 
-      return stops[stops.length - 1].color;
+        const cols = await grist.docApi.fetchTable('_grist_Tables_column');
+        const nC = (cols.colId || []).length;
+
+        for (let i = 0; i < nC; i++) {
+          if (cols.parentId?.[i] !== tableRef) continue;
+          const colId = cols.colId[i];
+          const label = cols.label?.[i] || colId;
+          if (colId) columnLabels[colId] = label;
+        }
+      } catch (e) {
+        console.warn("Не удалось загрузить labels (будут colId)", e);
+      }
     }
 
-    function getHeatColorByTarget(value, target) {
-      if (value == null || !Number.isFinite(value)) return '#f3f3f3';
+    function mapRecordsWithLabels(records) {
+      return (records || []).map(rec => {
+        const cleanRow = {};
+        Object.keys(rec).forEach(key => {
+          if (key === 'id' || key === 'manualSort') return;
+          const label = columnLabels[key] || key;
+          cleanRow[label] = rec[key];
+        });
+        return cleanRow;
+      });
+    }
 
-      const t = Number(target);
-      if (!Number.isFinite(t) || t <= 0) {
-        return interpolateMultiStopColor(KPI_HEAT_STOPS, 0.5);
+    async function ensureTableContextUpToDate() {
+      const tableId = await getTableIdSafe();
+      if (!tableId) return;
+
+      if (currentTableId !== tableId) {
+        currentTableId = tableId;
+        await loadColumnLabelsForCurrentTable();
       }
+    }
 
-      const ratio = Math.max(0, Math.min(1, value / t));
-      const adjusted = Math.pow(ratio, 1.15);
-
-      return interpolateMultiStopColor(KPI_HEAT_STOPS, adjusted);
+    function scheduleRender() {
+      if (renderInProgress) {
+        renderPending = true;
+        return;
+      }
+      renderPivot();
     }
 
     function findFieldByAliases(fields, aliases) {
@@ -835,81 +691,6 @@
         if (found) return found;
       }
       return null;
-    }
-
-    function isLikelyDateFieldName(fieldName) {
-      const n = normalizeLabel(fieldName);
-      return (
-        n.includes('ДАТ') ||
-        n.includes('DATE') ||
-        n.includes('ДЕНЬ') ||
-        n.includes('DAY')
-      );
-    }
-
-    function parseMaybeDate(v) {
-      if (v == null || v === '') return null;
-
-      if (v instanceof Date && !isNaN(v.getTime())) return v;
-
-      if (typeof v === 'number' && Number.isFinite(v)) {
-        if (v > 1e11) {
-          const d = new Date(v);
-          if (!isNaN(d.getTime())) return d;
-        }
-      }
-
-      const s = String(v).trim();
-      if (!s) return null;
-
-      let m = s.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})$/);
-      if (m) {
-        let dd = Number(m[1]);
-        let mm = Number(m[2]) - 1;
-        let yyyy = Number(m[3]);
-        if (yyyy < 100) yyyy += 2000;
-        const d = new Date(yyyy, mm, dd);
-        if (!isNaN(d.getTime())) return d;
-      }
-
-      m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-      if (m) {
-        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-        if (!isNaN(d.getTime())) return d;
-      }
-
-      const d2 = new Date(s);
-      if (!isNaN(d2.getTime())) return d2;
-
-      return null;
-    }
-
-    function fieldLooksLikeDate(fieldName, records) {
-      const sample = [];
-      for (const rec of records || []) {
-        const v = rec[fieldName];
-        if (v == null || v === '') continue;
-        sample.push(v);
-        if (sample.length >= 15) break;
-      }
-
-      if (!sample.length) return false;
-
-      const parsedCount = sample.filter(v => !!parseMaybeDate(v)).length;
-      return parsedCount / sample.length >= 0.6;
-    }
-
-    function findBestDateField(fields, records) {
-      const aliasHit = findFieldByAliases(fields, DATE_FIELD_ALIASES);
-      if (aliasHit) return aliasHit;
-
-      const likelyByName = fields.find(isLikelyDateFieldName);
-      if (likelyByName && fieldLooksLikeDate(likelyByName, records)) {
-        return likelyByName;
-      }
-
-      const likelyByContent = fields.find(f => fieldLooksLikeDate(f, records));
-      return likelyByContent || null;
     }
 
     function normalizeComparableValue(v) {
@@ -973,23 +754,54 @@
       });
     }
 
-    function compareValuesMaybeDate(a, b, fieldName) {
-      const da = parseMaybeDate(a);
-      const db = parseMaybeDate(b);
+    function parseMaybeDate(v) {
+      if (v == null || v === '') return null;
+      if (v instanceof Date && !isNaN(v.getTime())) return v;
 
-      if (da && db && (isLikelyDateFieldName(fieldName) || true)) {
-        return da.getTime() - db.getTime();
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        if (v > 1e11) {
+          const d = new Date(v);
+          if (!isNaN(d.getTime())) return d;
+        }
       }
 
+      const s = String(v).trim();
+      if (!s) return null;
+
+      let m = s.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})$/);
+      if (m) {
+        let dd = Number(m[1]);
+        let mm = Number(m[2]) - 1;
+        let yyyy = Number(m[3]);
+        if (yyyy < 100) yyyy += 2000;
+        const d = new Date(yyyy, mm, dd);
+        if (!isNaN(d.getTime())) return d;
+      }
+
+      m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (m) {
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (!isNaN(d.getTime())) return d;
+      }
+
+      const d2 = new Date(s);
+      if (!isNaN(d2.getTime())) return d2;
+
+      return null;
+    }
+
+    function compareValuesMaybeDate(a, b) {
+      const da = parseMaybeDate(a);
+      const db = parseMaybeDate(b);
+      if (da && db) return da.getTime() - db.getTime();
       return naturalCompare(a, b);
     }
 
-    function sortKeyArrays(keys, fieldNames = []) {
+    function sortKeyArrays(keys) {
       return [...keys].sort((ka, kb) => {
         const len = Math.max(ka.length, kb.length);
         for (let i = 0; i < len; i++) {
-          const fieldName = fieldNames[i];
-          const cmp = compareValuesMaybeDate(ka[i], kb[i], fieldName);
+          const cmp = compareValuesMaybeDate(ka[i], kb[i]);
           if (cmp !== 0) return cmp;
         }
         return 0;
@@ -1010,9 +822,7 @@
             push(record) {
               if (isCountaValue(record[fieldName])) count++;
             },
-            value() {
-              return count;
-            },
+            value() { return count; },
             format: formatter || (x => String(x)),
             numInputs: 0
           };
@@ -1020,6 +830,95 @@
       };
     }
 
+    function isLikelyDateFieldName(fieldName) {
+      const n = normalizeLabel(fieldName);
+      return n.includes('ДАТ') || n.includes('DATE') || n.includes('ДЕНЬ') || n.includes('DAY');
+    }
+
+    function fieldLooksLikeDate(fieldName, records) {
+      const sample = [];
+      for (const rec of records || []) {
+        const v = rec[fieldName];
+        if (v == null || v === '') continue;
+        sample.push(v);
+        if (sample.length >= 15) break;
+      }
+      if (!sample.length) return false;
+      const parsedCount = sample.filter(v => !!parseMaybeDate(v)).length;
+      return parsedCount / sample.length >= 0.6;
+    }
+
+    function findBestDateField(fields, records) {
+      const aliasHit = findFieldByAliases(fields, DATE_FIELD_ALIASES);
+      if (aliasHit) return aliasHit;
+
+      const likelyByName = fields.find(isLikelyDateFieldName);
+      if (likelyByName && fieldLooksLikeDate(likelyByName, records)) return likelyByName;
+
+      const likelyByContent = fields.find(f => fieldLooksLikeDate(f, records));
+      return likelyByContent || null;
+    }
+
+    function recordMatchesKeyArray(rec, fields, keyArr) {
+      if (!Array.isArray(fields) || !Array.isArray(keyArr)) return false;
+      if (fields.length !== keyArr.length) return false;
+
+      for (let i = 0; i < fields.length; i++) {
+        if (normalizeComparableValue(rec[fields[i]] ?? null) !== normalizeComparableValue(keyArr[i] ?? null)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // -----------------------------
+    // ПАЛИТРА KPI
+    // -----------------------------
+    const KPI_HEAT_STOPS = [
+      { t: 0.00, color: '#de6b6b' },
+      { t: 0.25, color: '#e6a05f' },
+      { t: 0.50, color: '#efd46d' },
+      { t: 0.75, color: '#a9bf58' },
+      { t: 1.00, color: '#54aa69' }
+    ];
+
+    function interpolateMultiStopColor(stops, t) {
+      const clamped = Math.max(0, Math.min(1, t));
+
+      if (clamped <= stops[0].t) return stops[0].color;
+      if (clamped >= stops[stops.length - 1].t) return stops[stops.length - 1].color;
+
+      for (let i = 0; i < stops.length - 1; i++) {
+        const left = stops[i];
+        const right = stops[i + 1];
+
+        if (clamped >= left.t && clamped <= right.t) {
+          const span = right.t - left.t || 1;
+          const localT = (clamped - left.t) / span;
+          return mixColors(left.color, right.color, localT);
+        }
+      }
+
+      return stops[stops.length - 1].color;
+    }
+
+    function getHeatColorByTarget(value, target) {
+      if (value == null || !Number.isFinite(value)) return '#f3f3f3';
+
+      const t = Number(target);
+      if (!Number.isFinite(t) || t <= 0) {
+        return interpolateMultiStopColor(KPI_HEAT_STOPS, 0.5);
+      }
+
+      const ratio = Math.max(0, Math.min(1, value / t));
+      const adjusted = Math.pow(ratio, 1.15);
+
+      return interpolateMultiStopColor(KPI_HEAT_STOPS, adjusted);
+    }
+
+    // -----------------------------
+    // KPI ЛОГИКА
+    // -----------------------------
     function createCounterBucket() {
       return {
         total: 0,
@@ -1136,13 +1035,12 @@
 
       if (groupFields.length > 0) {
         const orderedKeys = sortKeyArrays(
-          Array.from(byKey.keys()).map(k => JSON.parse(k)),
-          groupFields
+          Array.from(byKey.keys()).map(k => JSON.parse(k))
         );
 
         orderedBuckets = orderedKeys.map(keyArr => byKey.get(keyToString(keyArr)) || createCounterBucket());
         colLabels = orderedKeys.map(keyArr => keyArr.map(formatHeaderValue).join(' / '));
-        colKeys = orderedKeys.map(k => k);
+        colKeys = orderedKeys.map(keyArr => keyArr);
 
         orderedBuckets.push(grandBucket);
         colLabels.push('Итого');
@@ -1153,76 +1051,36 @@
         colKeys = [null];
       }
 
-      const metrics = makeMetricsFromBuckets(orderedBuckets);
-
       return {
-        metrics,
+        metrics: makeMetricsFromBuckets(orderedBuckets),
         colCount: orderedBuckets.length,
         colLabels,
         colKeys,
-        colFields: groupFields,
-        statusField,
-        countaField
+        colFields: groupFields
       };
     }
 
     function buildDerivedMetricsFromRecords(records, config) {
       if (!records || !records.length) return null;
-
       const fields = Object.keys(records[0] || {});
       const colFields = Array.isArray(config?.cols)
         ? config.cols.filter(f => fields.includes(f))
         : [];
-
       return buildDerivedMetricsGrouped(records, config, colFields);
     }
 
-    function recordMatchesKeyArray(rec, fields, keyArr) {
-      if (!Array.isArray(fields) || !Array.isArray(keyArr)) return false;
-      if (fields.length !== keyArr.length) return false;
-
-      for (let i = 0; i < fields.length; i++) {
-        const f = fields[i];
-        if (normalizeComparableValue(rec[f] ?? null) !== normalizeComparableValue(keyArr[i] ?? null)) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    function buildDateDetailForColumn(records, config, sourceColFields, sourceColKey) {
-      if (!records || !records.length) return { error: 'Нет данных' };
-
-      const fields = Object.keys(records[0] || {});
-      const dateField = findBestDateField(fields, records);
-
-      if (!dateField) {
-        return { error: 'Не найдено поле даты для детализации' };
-      }
-
-      const extraFilter = (rec) => {
-        if (!Array.isArray(sourceColFields) || !sourceColFields.length || !Array.isArray(sourceColKey)) {
-          return true;
-        }
-        return recordMatchesKeyArray(rec, sourceColFields, sourceColKey);
-      };
-
-      const result = buildDerivedMetricsGrouped(records, config, [dateField], extraFilter);
-      if (!result) {
-        return { error: 'Не удалось построить детализацию' };
-      }
-
-      return {
-        ...result,
-        dateField
-      };
+    // -----------------------------
+    // LAYOUT HELPERS
+    // -----------------------------
+    function getMainRendererArea() {
+      return document.querySelector('#output .pvtRendererArea');
     }
 
     function getMainTableLayoutHints(expectedCols) {
       let labelWidth = isViewOnly ? 260 : 370;
       let dataWidths = Array(expectedCols).fill(80);
 
-      const rendererArea = document.querySelector('#output .pvtRendererArea');
+      const rendererArea = getMainRendererArea();
       if (!rendererArea) return { labelWidth, dataWidths };
 
       const mainTable = rendererArea.querySelector('.pvtTable:not(.derivedTable)');
@@ -1250,9 +1108,7 @@
 
       if (!refTds.length) {
         const firstDataRow = bodyRows.find(tr => tr.querySelectorAll('td').length > 0);
-        if (firstDataRow) {
-          refTds = Array.from(firstDataRow.querySelectorAll('td'));
-        }
+        if (firstDataRow) refTds = Array.from(firstDataRow.querySelectorAll('td'));
       }
 
       if (refTds.length) {
@@ -1306,205 +1162,19 @@
       });
     }
 
-    function closeDetailPopover() {
-      if (detailPopoverCleanup.length) {
-        detailPopoverCleanup.forEach(fn => {
-          try { fn(); } catch (e) {}
-        });
-      }
-      detailPopoverCleanup = [];
-
-      if (detailPopoverEl) {
-        detailPopoverEl.remove();
-        detailPopoverEl = null;
-      }
-    }
-
-    function positionDetailPopover(popover, anchorEl) {
-      if (!popover || !anchorEl) return;
-
-      const rect = anchorEl.getBoundingClientRect();
-      const popRect = popover.getBoundingClientRect();
-
-      let left = rect.left;
-      let top = rect.bottom + 8;
-
-      if (left + popRect.width > window.innerWidth - 8) {
-        left = window.innerWidth - popRect.width - 8;
-      }
-      if (left < 8) left = 8;
-
-      if (top + popRect.height > window.innerHeight - 8) {
-        top = rect.top - popRect.height - 8;
-      }
-      if (top < 8) top = 8;
-
-      popover.style.left = `${left}px`;
-      popover.style.top = `${top}px`;
-    }
-
-    function renderDetailTable(result) {
-      if (!result || result.error) {
-        const div = document.createElement('div');
-        div.className = 'metric-detail-empty';
-        div.textContent = result?.error || 'Нет данных для детализации';
-        return div;
-      }
-
-      const table = document.createElement('table');
-      table.className = 'metric-detail-table';
-
-      const thead = document.createElement('thead');
-      const htr = document.createElement('tr');
-
-      const corner = document.createElement('th');
-      corner.className = 'detail-corner';
-      corner.textContent = '';
-      htr.appendChild(corner);
-
-      result.colLabels.forEach(label => {
-        const th = document.createElement('th');
-        th.className = 'detail-col-header';
-        th.textContent = label;
-        htr.appendChild(th);
-      });
-
-      thead.appendChild(htr);
-      table.appendChild(thead);
-
-      const tbody = document.createElement('tbody');
-
-      result.metrics.forEach(metric => {
-        const tr = document.createElement('tr');
-
-        const rowLabel = document.createElement('th');
-        rowLabel.className = 'detail-row-label';
-        rowLabel.textContent = metric.label;
-        tr.appendChild(rowLabel);
-
-        const target = getMetricTarget(metric.key);
-
-        metric.values.forEach(val => {
-          const td = document.createElement('td');
-          td.className = 'detail-val';
-          td.textContent = formatPercentRU(val, metric.digits);
-
-          if (val == null || !Number.isFinite(val)) {
-            td.classList.add('detail-na');
-          } else {
-            const bg = getHeatColorByTarget(val, target);
-            td.style.backgroundColor = bg;
-            td.style.color = '#fff';
-          }
-
-          tr.appendChild(td);
-        });
-
-        tbody.appendChild(tr);
-      });
-
-      table.appendChild(tbody);
-      return table;
-    }
-
-    function openDetailPopover(anchorEl, colLabel, sourceColFields, sourceColKey) {
-      closeDetailPopover();
-
-      const detail = buildDateDetailForColumn(mappedRecords, currentPivotConfig, sourceColFields, sourceColKey);
-
-      const popover = document.createElement('div');
-      popover.className = 'metric-detail-popover';
-
-      const header = document.createElement('div');
-      header.className = 'metric-detail-popover-header';
-
-      const titleWrap = document.createElement('div');
-      titleWrap.className = 'metric-detail-popover-title-wrap';
-
-      const title = document.createElement('div');
-      title.className = 'metric-detail-popover-title';
-      title.textContent = `Детализация: ${colLabel}`;
-
-      const subtitle = document.createElement('div');
-      subtitle.className = 'metric-detail-popover-subtitle';
-      subtitle.textContent = detail?.dateField
-        ? `Та же KPI-статистика по датам (${detail.dateField})`
-        : 'Та же KPI-статистика по датам';
-
-      titleWrap.appendChild(title);
-      titleWrap.appendChild(subtitle);
-
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'metric-detail-popover-close';
-      closeBtn.type = 'button';
-      closeBtn.textContent = '×';
-      closeBtn.title = 'Закрыть';
-      closeBtn.addEventListener('click', closeDetailPopover);
-
-      header.appendChild(titleWrap);
-      header.appendChild(closeBtn);
-
-      const body = document.createElement('div');
-      body.className = 'metric-detail-popover-body';
-      body.appendChild(renderDetailTable(detail));
-
-      popover.appendChild(header);
-      popover.appendChild(body);
-
-      popover.addEventListener('mousedown', (e) => e.stopPropagation());
-      popover.addEventListener('click', (e) => e.stopPropagation());
-
-      document.body.appendChild(popover);
-      detailPopoverEl = popover;
-      positionDetailPopover(popover, anchorEl);
-
-      const onDocDown = (e) => {
-        if (!popover.contains(e.target) && e.target !== anchorEl) {
-          closeDetailPopover();
-        }
-      };
-
-      const onResize = () => {
-        if (detailPopoverEl) positionDetailPopover(detailPopoverEl, anchorEl);
-      };
-
-      const onKeydown = (e) => {
-        if (e.key === 'Escape') {
-          closeDetailPopover();
-        }
-      };
-
-      setTimeout(() => {
-        document.addEventListener('mousedown', onDocDown);
-      }, 0);
-
-      window.addEventListener('resize', onResize);
-      document.addEventListener('keydown', onKeydown);
-
-      detailPopoverCleanup.push(() => document.removeEventListener('mousedown', onDocDown));
-      detailPopoverCleanup.push(() => window.removeEventListener('resize', onResize));
-      detailPopoverCleanup.push(() => document.removeEventListener('keydown', onKeydown));
-    }
-
-    function renderSecondFormulaTable() {
-      const rendererArea = document.querySelector('#output .pvtRendererArea');
+    // -----------------------------
+    // РЕНДЕР KPI-ТАБЛИЦЫ
+    // -----------------------------
+    function renderDerivedMetricsTable(result, rendererArea) {
       if (!rendererArea) return;
 
-      const old = document.getElementById('secondary-table-wrap');
+      const old = rendererArea.querySelector('#secondary-table-wrap');
       if (old) old.remove();
-
-      const result = buildDerivedMetricsFromRecords(mappedRecords, currentPivotConfig);
-      currentDerivedResult = result;
 
       if (!result) return;
 
-      const { metrics, colCount, colLabels, colKeys, colFields } = result;
+      const { metrics, colCount, colLabels } = result;
       const { labelWidth, dataWidths } = getMainTableLayoutHints(colCount);
-
-      const dateFieldExists = !!findBestDateField(
-        Object.keys(mappedRecords[0] || {}),
-        mappedRecords
-      );
 
       const wrap = document.createElement('div');
       wrap.id = 'secondary-table-wrap';
@@ -1526,33 +1196,7 @@
       colLabels.forEach((label, idx) => {
         const th = document.createElement('th');
         th.className = 'metric-col-header pvtColLabel';
-
-        const inner = document.createElement('div');
-        inner.className = 'metric-col-header-inner';
-
-        const text = document.createElement('span');
-        text.className = 'metric-col-header-text';
-        text.textContent = label;
-        inner.appendChild(text);
-
-        const colKey = colKeys?.[idx] ?? null;
-        const canDrill = dateFieldExists && Array.isArray(colKey) && colKey.length > 0 && label !== 'Итого';
-
-        if (canDrill) {
-          const btn = document.createElement('button');
-          btn.className = 'metric-detail-btn';
-          btn.type = 'button';
-          btn.textContent = '▾';
-          btn.title = 'Открыть статистику этой недели по датам';
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            openDetailPopover(btn, label, colFields, colKey);
-          });
-          inner.appendChild(btn);
-        }
-
-        th.appendChild(inner);
+        th.textContent = label;
 
         const w = dataWidths[idx] || 80;
         th.style.width = `${w}px`;
@@ -1632,8 +1276,7 @@
           if (val == null || !Number.isFinite(val)) {
             td.classList.add('metric-na');
           } else {
-            const bg = getHeatColorByTarget(val, target);
-            td.style.backgroundColor = bg;
+            td.style.backgroundColor = getHeatColorByTarget(val, target);
             td.style.color = '#fff';
           }
 
@@ -1648,13 +1291,95 @@
       rendererArea.appendChild(wrap);
     }
 
-    function postRenderEnhance() {
-      closeDetailPopover();
-      initIndividualResizing();
-      renderSecondFormulaTable();
-      syncSecondaryTableWidthsFromMain();
-      initIndividualResizing();
-      applyZoom();
+    // -----------------------------
+    // СТРЕЛКИ В ВЕРХНЕЙ ТАБЛИЦЕ
+    // -----------------------------
+    function openDrilldownView(sourceColLabel, sourceColFields, sourceColKey) {
+      currentDrilldown = {
+        sourceColLabel,
+        sourceColFields: Array.isArray(sourceColFields) ? [...sourceColFields] : [],
+        sourceColKey: Array.isArray(sourceColKey) ? [...sourceColKey] : []
+      };
+      scheduleRender();
+    }
+
+    function exitDrilldownView() {
+      currentDrilldown = null;
+      scheduleRender();
+    }
+
+    function injectDrillButtonsIntoMainPivotHeaders() {
+      if (currentDrilldown) return;
+      if (!currentDerivedResult) return;
+      if (!mappedRecords.length) return;
+
+      const fields = Object.keys(mappedRecords[0] || {});
+      const dateField = findBestDateField(fields, mappedRecords);
+      if (!dateField) return;
+
+      const sourceColFields = currentDerivedResult.colFields || [];
+      const drillable = (currentDerivedResult.colKeys || []).filter(k => Array.isArray(k) && k.length > 0);
+      if (!drillable.length) return;
+
+      const mainTable = document.querySelector('#output .pvtRendererArea .pvtTable:not(.derivedTable)');
+      if (!mainTable) return;
+
+      const theadRows = Array.from(mainTable.querySelectorAll('thead tr'));
+      if (!theadRows.length) return;
+
+      let headerCells = null;
+      const expectedCount = drillable.length;
+
+      for (const row of theadRows) {
+        const cells = Array.from(row.querySelectorAll('th.pvtColLabel'));
+        if (cells.length === expectedCount) {
+          headerCells = cells;
+        }
+      }
+
+      if (!headerCells) {
+        const lastRow = theadRows[theadRows.length - 1];
+        if (!lastRow) return;
+        headerCells = Array.from(lastRow.querySelectorAll('th.pvtColLabel'));
+      }
+
+      if (!headerCells || !headerCells.length) return;
+
+      const effectiveCells = headerCells.slice(0, expectedCount);
+      if (!effectiveCells.length) return;
+
+      effectiveCells.forEach((cell, idx) => {
+        if (cell.querySelector('.pivot-drill-btn')) return;
+
+        const colKey = drillable[idx];
+        const label = currentDerivedResult.colLabels[idx];
+
+        const rawText = cell.textContent.trim() || label;
+
+        cell.innerHTML = '';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'pivot-col-header-inner';
+
+        const text = document.createElement('span');
+        text.className = 'pivot-col-header-text';
+        text.textContent = rawText;
+
+        const btn = document.createElement('button');
+        btn.className = 'pivot-drill-btn';
+        btn.type = 'button';
+        btn.textContent = '↗';
+        btn.title = 'Открыть эту неделю по датам';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openDrilldownView(label, sourceColFields, colKey);
+        });
+
+        wrap.appendChild(text);
+        wrap.appendChild(btn);
+        cell.appendChild(wrap);
+      });
     }
 
     // -----------------------------
@@ -1719,7 +1444,7 @@
       config.isViewOnly = isViewOnly;
       await grist.setOption(key, config);
 
-      rerenderKpiTableOnly();
+      scheduleRender();
     }
 
     function updateViewMode() {
@@ -1738,10 +1463,206 @@
     }
 
     // -----------------------------
-    // RENDER PIVOT
+    // AGGREGATORS
+    // -----------------------------
+    function buildAggregators(fields) {
+      const tpl = $.pivotUtilities.aggregators;
+      const intFormatter = $.pivotUtilities.numberFormat({ digitsAfterDecimal: 0 });
+      const countaField = findFieldByAliases(fields, COUNTA_FIELD_ALIASES);
+
+      const myAggregators = {
+        "Количество":            tpl["Count"],
+        "Количество уникальных": tpl["Count Unique Values"],
+        "Кол-во по всему":       tpl["Count as Fraction of Total"],
+        "Кол-во по строке":      tpl["Count as Fraction of Rows"],
+        "Кол-во по столбцу":     tpl["Count as Fraction of Columns"]
+      };
+
+      if (countaField) {
+        myAggregators[`COUNTA по ${countaField}`] = makeCountaAggregatorForField(countaField, intFormatter);
+      }
+
+      return myAggregators;
+    }
+
+    // -----------------------------
+    // MAIN VIEW
+    // -----------------------------
+    function postRenderEnhanceMain() {
+      initIndividualResizing();
+
+      currentDerivedResult = buildDerivedMetricsFromRecords(mappedRecords, currentPivotConfig);
+      renderDerivedMetricsTable(currentDerivedResult, getMainRendererArea());
+
+      syncSecondaryTableWidthsFromMain();
+      injectDrillButtonsIntoMainPivotHeaders();
+      initIndividualResizing();
+      applyZoom();
+    }
+
+    function renderMainView(currentRecords, key, myAggregators) {
+      const ruLocales = $.pivotUtilities.locales.ru;
+
+      const options = {
+        renderers: ruLocales.renderers,
+        aggregators: myAggregators,
+
+        rendererName: currentPivotConfig.rendererName,
+        aggregatorName: currentPivotConfig.aggregatorName,
+
+        rows: currentPivotConfig.rows,
+        cols: currentPivotConfig.cols,
+        vals: currentPivotConfig.vals,
+
+        inclusions: currentPivotConfig.inclusions,
+        exclusions: currentPivotConfig.exclusions,
+
+        unusedAttrsVertical: false,
+
+        onRefresh: function(cfg) {
+          let refreshedAggregatorName = cfg.aggregatorName || "Количество";
+          if (!myAggregators[refreshedAggregatorName]) {
+            refreshedAggregatorName = "Количество";
+          }
+
+          currentPivotConfig = {
+            rows: cfg.rows || [],
+            cols: cfg.cols || [],
+            vals: cfg.vals || [],
+            inclusions: cfg.inclusions || {},
+            exclusions: cfg.exclusions || {},
+            rendererName: cfg.rendererName || "Таблица",
+            aggregatorName: refreshedAggregatorName
+          };
+
+          const configToSave = {
+            rows: currentPivotConfig.rows,
+            cols: currentPivotConfig.cols,
+            vals: currentPivotConfig.vals,
+            rendererName: currentPivotConfig.rendererName,
+            aggregatorName: currentPivotConfig.aggregatorName,
+            inclusions: currentPivotConfig.inclusions,
+            exclusions: currentPivotConfig.exclusions,
+            isViewOnly: isViewOnly,
+            zoomLevel: currentZoom,
+            metricTargets: currentMetricTargets
+          };
+
+          grist.setOption(key, configToSave);
+
+          setTimeout(() => postRenderEnhanceMain(), 200);
+        }
+      };
+
+      $("#output").empty().pivotUI(currentRecords, options, true);
+      setTimeout(() => postRenderEnhanceMain(), 200);
+    }
+
+    // -----------------------------
+    // DETAIL VIEW
+    // -----------------------------
+    function renderDetailView(currentRecords, fields, myAggregators) {
+      const dateField = findBestDateField(fields, currentRecords);
+
+      $("#output").empty();
+
+      const root = document.createElement('div');
+      root.id = 'detail-view-root';
+
+      const backbar = document.createElement('div');
+      backbar.id = 'detail-backbar';
+
+      const backBtn = document.createElement('button');
+      backBtn.id = 'detail-back-btn';
+      backBtn.type = 'button';
+      backBtn.textContent = '← Вернуться к неделям';
+      backBtn.addEventListener('click', exitDrilldownView);
+
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'detail-title-wrap';
+
+      const title = document.createElement('div');
+      title.id = 'detail-title';
+      title.textContent = `Неделя: ${currentDrilldown?.sourceColLabel || '—'}`;
+
+      const subtitle = document.createElement('div');
+      subtitle.id = 'detail-subtitle';
+      subtitle.textContent = dateField
+        ? `Детализация по датам (${dateField})`
+        : 'Не найдено поле даты для детализации';
+
+      titleWrap.appendChild(title);
+      titleWrap.appendChild(subtitle);
+
+      backbar.appendChild(backBtn);
+      backbar.appendChild(titleWrap);
+
+      const rendererArea = document.createElement('div');
+      rendererArea.className = 'pvtRendererArea';
+
+      root.appendChild(backbar);
+      root.appendChild(rendererArea);
+      document.getElementById('output').appendChild(root);
+
+      if (!dateField) {
+        const msg = document.createElement('div');
+        msg.className = 'detail-empty-msg';
+        msg.textContent = 'Не удалось определить поле даты, поэтому раскрытие недели по дням недоступно.';
+        rendererArea.appendChild(msg);
+        applyZoom();
+        return;
+      }
+
+      const filteredRecords = currentRecords.filter(rec =>
+        recordMatchesPivotFilters(rec, currentPivotConfig) &&
+        recordMatchesKeyArray(rec, currentDrilldown.sourceColFields, currentDrilldown.sourceColKey)
+      );
+
+      if (!filteredRecords.length) {
+        const msg = document.createElement('div');
+        msg.className = 'detail-empty-msg';
+        msg.textContent = 'Нет данных для выбранной недели.';
+        rendererArea.appendChild(msg);
+        applyZoom();
+        return;
+      }
+
+      const detailPivotOptions = {
+        renderers: $.pivotUtilities.locales.ru.renderers,
+        aggregators: myAggregators,
+        rendererName: currentPivotConfig.rendererName,
+        aggregatorName: currentPivotConfig.aggregatorName,
+        rows: currentPivotConfig.rows,
+        cols: [dateField],
+        vals: currentPivotConfig.vals
+      };
+
+      $(rendererArea).pivot(filteredRecords, detailPivotOptions);
+
+      const detailResult = buildDerivedMetricsGrouped(
+        currentRecords,
+        currentPivotConfig,
+        [dateField],
+        rec => recordMatchesKeyArray(rec, currentDrilldown.sourceColFields, currentDrilldown.sourceColKey)
+      );
+
+      currentDerivedResult = detailResult;
+      renderDerivedMetricsTable(detailResult, rendererArea);
+
+      setTimeout(() => {
+        initIndividualResizing();
+        syncSecondaryTableWidthsFromMain();
+        initIndividualResizing();
+        applyZoom();
+      }, 80);
+    }
+
+    // -----------------------------
+    // RENDER
     // -----------------------------
     async function renderPivot() {
       renderInProgress = true;
+
       try {
         await ensureTableContextUpToDate();
 
@@ -1765,27 +1686,9 @@
         }
 
         currentMetricTargets = normalizeMetricTargets(savedConfig.metricTargets);
-
         updateViewMode();
 
-        const ruLocales = $.pivotUtilities.locales.ru;
-        const tpl = $.pivotUtilities.aggregators;
-        const intFormatter = $.pivotUtilities.numberFormat({ digitsAfterDecimal: 0 });
-
-        const countaField = findFieldByAliases(fields, COUNTA_FIELD_ALIASES);
-
-        const myAggregators = {
-          "Количество":            tpl["Count"],
-          "Количество уникальных": tpl["Count Unique Values"],
-          "Кол-во по всему":       tpl["Count as Fraction of Total"],
-          "Кол-во по строке":      tpl["Count as Fraction of Rows"],
-          "Кол-во по столбцу":     tpl["Count as Fraction of Columns"]
-        };
-
-        if (countaField) {
-          myAggregators[`COUNTA по ${countaField}`] = makeCountaAggregatorForField(countaField, intFormatter);
-        }
-
+        const myAggregators = buildAggregators(fields);
         const safeConfig = sanitizeConfig(savedConfig, fields);
 
         let resolvedAggregatorName = safeConfig.aggregatorName || "Количество";
@@ -1803,64 +1706,11 @@
           aggregatorName: resolvedAggregatorName
         };
 
-        const options = {
-          renderers: ruLocales.renderers,
-          aggregators: myAggregators,
-
-          rendererName: currentPivotConfig.rendererName,
-          aggregatorName: currentPivotConfig.aggregatorName,
-
-          rows: currentPivotConfig.rows,
-          cols: currentPivotConfig.cols,
-          vals: currentPivotConfig.vals,
-
-          inclusions: currentPivotConfig.inclusions,
-          exclusions: currentPivotConfig.exclusions,
-
-          unusedAttrsVertical: false,
-
-          onRefresh: function (cfg) {
-            let refreshedAggregatorName = cfg.aggregatorName || "Количество";
-            if (!myAggregators[refreshedAggregatorName]) {
-              refreshedAggregatorName = "Количество";
-            }
-
-            currentPivotConfig = {
-              rows: cfg.rows || [],
-              cols: cfg.cols || [],
-              vals: cfg.vals || [],
-              inclusions: cfg.inclusions || {},
-              exclusions: cfg.exclusions || {},
-              rendererName: cfg.rendererName || "Таблица",
-              aggregatorName: refreshedAggregatorName
-            };
-
-            const configToSave = {
-              rows: currentPivotConfig.rows,
-              cols: currentPivotConfig.cols,
-              vals: currentPivotConfig.vals,
-              rendererName: currentPivotConfig.rendererName,
-              aggregatorName: currentPivotConfig.aggregatorName,
-              inclusions: currentPivotConfig.inclusions,
-              exclusions: currentPivotConfig.exclusions,
-              isViewOnly: isViewOnly,
-              zoomLevel: currentZoom,
-              metricTargets: currentMetricTargets
-            };
-
-            grist.setOption(key, configToSave);
-
-            setTimeout(() => {
-              postRenderEnhance();
-            }, 200);
-          }
-        };
-
-        $("#output").empty().pivotUI(currentRecords, options, true);
-
-        setTimeout(() => {
-          postRenderEnhance();
-        }, 200);
+        if (currentDrilldown) {
+          renderDetailView(currentRecords, fields, myAggregators);
+        } else {
+          renderMainView(currentRecords, key, myAggregators);
+        }
 
       } catch (e) {
         console.error(e);
@@ -1875,16 +1725,16 @@
     }
 
     // -----------------------------
-    // GRIST: подписка на записи
+    // GRIST
     // -----------------------------
-    grist.onRecords(function (records) {
+    grist.onRecords(function(records) {
       rawRecords = records || [];
       lastDataStamp = Date.now();
       scheduleRender();
     }, { format: "rows", includeColumns: "normal" });
 
     // -----------------------------
-    // 1) ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ
+    // ГЛОБАЛЬНОЕ РАСТЯГИВАНИЕ
     // -----------------------------
     function setupGlobalResizers() {
       const dragCols = document.getElementById('drag-all-cols');
@@ -1955,7 +1805,7 @@
     setupGlobalResizers();
 
     // -----------------------------
-    // 2) ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ
+    // ИНДИВИДУАЛЬНЫЕ РЕСАЙЗЕРЫ
     // -----------------------------
     function initIndividualResizing() {
       const headers = document.querySelectorAll('.pvtTable th');
@@ -2027,7 +1877,6 @@
           cell.style.width = `${newW}px`;
           cell.style.maxWidth = `${newW}px`;
           cell.style.minWidth = '30px';
-
           syncSecondaryTableWidthsFromMain();
         }
       };
