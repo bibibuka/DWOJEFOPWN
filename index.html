@@ -754,15 +754,18 @@
       });
     }
 
+    // ВАЖНО:
+    // больше НЕ пытаемся парсить произвольные строки "50", "51", "52" как даты.
+    // Иначе недели ломают порядок.
     function parseMaybeDate(v) {
       if (v == null || v === '') return null;
+
       if (v instanceof Date && !isNaN(v.getTime())) return v;
 
-      if (typeof v === 'number' && Number.isFinite(v)) {
-        if (v > 1e11) {
-          const d = new Date(v);
-          if (!isNaN(d.getTime())) return d;
-        }
+      if (typeof v === 'number' && Number.isFinite(v) && v > 1e11) {
+        const d = new Date(v);
+        if (!isNaN(d.getTime())) return d;
+        return null;
       }
 
       const s = String(v).trim();
@@ -778,14 +781,17 @@
         if (!isNaN(d.getTime())) return d;
       }
 
-      m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
       if (m) {
         const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
         if (!isNaN(d.getTime())) return d;
       }
 
-      const d2 = new Date(s);
-      if (!isNaN(d2.getTime())) return d2;
+      m = s.match(/^(\d{4})[./](\d{1,2})[./](\d{1,2})$/);
+      if (m) {
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (!isNaN(d.getTime())) return d;
+      }
 
       return null;
     }
@@ -1070,12 +1076,102 @@
     }
 
     // -----------------------------
-    // LAYOUT HELPERS
+    // HELPERS ДЛЯ ПОРЯДКА КОЛОНОК
     // -----------------------------
     function getMainRendererArea() {
       return document.querySelector('#output .pvtRendererArea');
     }
 
+    function normalizeVisibleHeaderText(text) {
+      return String(text ?? '')
+        .replace(/[↗▾]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function getPivotLeafHeaderCells(rendererArea) {
+      if (!rendererArea) return [];
+      const pivotTable = rendererArea.querySelector('.pvtTable:not(.derivedTable)');
+      if (!pivotTable) return [];
+
+      const headRows = Array.from(pivotTable.querySelectorAll('thead tr'));
+      if (!headRows.length) return [];
+
+      let bestCells = [];
+      for (const row of headRows) {
+        const cells = Array.from(row.querySelectorAll('th.pvtColLabel'));
+        if (cells.length > bestCells.length) {
+          bestCells = cells;
+        }
+      }
+
+      return bestCells || [];
+    }
+
+    function reorderDerivedResultByIndices(result, indices) {
+      if (!result || !Array.isArray(indices) || !indices.length) return result;
+
+      return {
+        ...result,
+        colLabels: indices.map(i => result.colLabels[i]),
+        colKeys: indices.map(i => result.colKeys[i]),
+        colCount: indices.length,
+        metrics: result.metrics.map(metric => ({
+          ...metric,
+          values: indices.map(i => metric.values[i])
+        }))
+      };
+    }
+
+    function reorderDerivedResultToRenderer(result, rendererArea) {
+      if (!result) return result;
+
+      const leafCells = getPivotLeafHeaderCells(rendererArea);
+      if (!leafCells.length) return result;
+
+      const domLabels = leafCells.map(cell => normalizeVisibleHeaderText(cell.textContent));
+
+      const nonTotalIndices = [];
+      let totalIndex = null;
+
+      result.colLabels.forEach((label, idx) => {
+        const n = normalizeLabel(label);
+        if (n === 'ИТОГО' || n === 'TOTALS') {
+          totalIndex = idx;
+        } else {
+          nonTotalIndices.push(idx);
+        }
+      });
+
+      const buckets = new Map();
+      nonTotalIndices.forEach(idx => {
+        const key = normalizeVisibleHeaderText(result.colLabels[idx]);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(idx);
+      });
+
+      const orderedIndices = [];
+
+      domLabels.forEach(label => {
+        const queue = buckets.get(label);
+        if (queue && queue.length) {
+          orderedIndices.push(queue.shift());
+        }
+      });
+
+      for (const queue of buckets.values()) {
+        while (queue.length) orderedIndices.push(queue.shift());
+      }
+
+      if (totalIndex != null) orderedIndices.push(totalIndex);
+
+      if (!orderedIndices.length) return result;
+      return reorderDerivedResultByIndices(result, orderedIndices);
+    }
+
+    // -----------------------------
+    // LAYOUT
+    // -----------------------------
     function getMainTableLayoutHints(expectedCols) {
       let labelWidth = isViewOnly ? 260 : 370;
       let dataWidths = Array(expectedCols).fill(80);
@@ -1292,7 +1388,7 @@
     }
 
     // -----------------------------
-    // СТРЕЛКИ В ВЕРХНЕЙ ТАБЛИЦЕ
+    // DRILLDOWN
     // -----------------------------
     function openDrilldownView(sourceColLabel, sourceColFields, sourceColKey) {
       currentDrilldown = {
@@ -1317,44 +1413,39 @@
       const dateField = findBestDateField(fields, mappedRecords);
       if (!dateField) return;
 
-      const sourceColFields = currentDerivedResult.colFields || [];
-      const drillable = (currentDerivedResult.colKeys || []).filter(k => Array.isArray(k) && k.length > 0);
-      if (!drillable.length) return;
+      const rendererArea = getMainRendererArea();
+      const leafCells = getPivotLeafHeaderCells(rendererArea);
+      if (!leafCells.length) return;
 
-      const mainTable = document.querySelector('#output .pvtRendererArea .pvtTable:not(.derivedTable)');
-      if (!mainTable) return;
+      const nonTotalIndices = currentDerivedResult.colLabels
+        .map((label, idx) => ({ label, idx }))
+        .filter(x => {
+          const n = normalizeLabel(x.label);
+          return n !== 'ИТОГО' && n !== 'TOTALS';
+        })
+        .map(x => x.idx);
 
-      const theadRows = Array.from(mainTable.querySelectorAll('thead tr'));
-      if (!theadRows.length) return;
+      const pairCount = Math.min(leafCells.length, nonTotalIndices.length);
+      if (!pairCount) return;
 
-      let headerCells = null;
-      const expectedCount = drillable.length;
+      for (let i = 0; i < pairCount; i++) {
+        const cell = leafCells[i];
+        const resultIdx = nonTotalIndices[i];
+        const colKey = currentDerivedResult.colKeys[resultIdx];
+        const label = currentDerivedResult.colLabels[resultIdx];
 
-      for (const row of theadRows) {
-        const cells = Array.from(row.querySelectorAll('th.pvtColLabel'));
-        if (cells.length === expectedCount) {
-          headerCells = cells;
-        }
-      }
+        if (cell.querySelector('.pivot-drill-btn')) continue;
 
-      if (!headerCells) {
-        const lastRow = theadRows[theadRows.length - 1];
-        if (!lastRow) return;
-        headerCells = Array.from(lastRow.querySelectorAll('th.pvtColLabel'));
-      }
+        const hasNullInside = Array.isArray(colKey) && colKey.some(v => v == null || v === '');
+        const canDrill =
+          Array.isArray(colKey) &&
+          colKey.length > 0 &&
+          !hasNullInside &&
+          normalizeLabel(label) !== 'NULL';
 
-      if (!headerCells || !headerCells.length) return;
+        if (!canDrill) continue;
 
-      const effectiveCells = headerCells.slice(0, expectedCount);
-      if (!effectiveCells.length) return;
-
-      effectiveCells.forEach((cell, idx) => {
-        if (cell.querySelector('.pivot-drill-btn')) return;
-
-        const colKey = drillable[idx];
-        const label = currentDerivedResult.colLabels[idx];
-
-        const rawText = cell.textContent.trim() || label;
+        const rawText = normalizeVisibleHeaderText(cell.textContent) || label;
 
         cell.innerHTML = '';
 
@@ -1373,13 +1464,13 @@
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          openDrilldownView(label, sourceColFields, colKey);
+          openDrilldownView(label, currentDerivedResult.colFields, colKey);
         });
 
         wrap.appendChild(text);
         wrap.appendChild(btn);
         cell.appendChild(wrap);
-      });
+      }
     }
 
     // -----------------------------
@@ -1491,8 +1582,11 @@
     function postRenderEnhanceMain() {
       initIndividualResizing();
 
-      currentDerivedResult = buildDerivedMetricsFromRecords(mappedRecords, currentPivotConfig);
-      renderDerivedMetricsTable(currentDerivedResult, getMainRendererArea());
+      let result = buildDerivedMetricsFromRecords(mappedRecords, currentPivotConfig);
+      result = reorderDerivedResultToRenderer(result, getMainRendererArea());
+
+      currentDerivedResult = result;
+      renderDerivedMetricsTable(result, getMainRendererArea());
 
       syncSecondaryTableWidthsFromMain();
       injectDrillButtonsIntoMainPivotHeaders();
@@ -1639,12 +1733,14 @@
 
       $(rendererArea).pivot(filteredRecords, detailPivotOptions);
 
-      const detailResult = buildDerivedMetricsGrouped(
+      let detailResult = buildDerivedMetricsGrouped(
         currentRecords,
         currentPivotConfig,
         [dateField],
         rec => recordMatchesKeyArray(rec, currentDrilldown.sourceColFields, currentDrilldown.sourceColKey)
       );
+
+      detailResult = reorderDerivedResultToRenderer(detailResult, rendererArea);
 
       currentDerivedResult = detailResult;
       renderDerivedMetricsTable(detailResult, rendererArea);
