@@ -7,18 +7,31 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.css">
 
   <style>
+    :root {
+      --excel-green: #217346;
+      --excel-green-dark: #185c37;
+      --excel-blue: #5b9bd5;
+      --excel-blue-dark: #2f5597;
+      --excel-blue-light: #d9e2f3;
+      --excel-border: #b7c9e2;
+      --excel-surface: #f7fbff;
+      --excel-surface-alt: #eef4fb;
+      --excel-text: #1f1f1f;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
       padding: 0;
       background-color: white;
+      color: var(--excel-text);
     }
 
     /* --- ТУЛБАР --- */
     #toolbar {
       padding: 8px 12px;
-      background: #f7f7f7;
-      border-bottom: 1px solid #e0e0e0;
+      background: var(--excel-surface);
+      border-bottom: 1px solid var(--excel-border);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -65,11 +78,11 @@
     .global-drag:hover { background: #f0f0f0; }
     .global-drag:active {
       background: #e0f0ea;
-      border-color: #169366;
+      border-color: var(--excel-green);
     }
 
     button#toggle-mode {
-      background-color: #169366;
+      background-color: var(--excel-green);
       color: white;
       border: none;
       padding: 6px 15px;
@@ -79,10 +92,10 @@
       font-weight: 600;
     }
 
-    button#toggle-mode:hover { background-color: #127a55; }
+    button#toggle-mode:hover { background-color: var(--excel-green-dark); }
 
     button#toggle-link-widths {
-      background-color: #8b98ab;
+      background-color: var(--excel-blue);
       color: white;
       border: none;
       padding: 6px 15px;
@@ -92,7 +105,7 @@
       font-weight: 600;
     }
 
-    button#toggle-link-widths:hover { background-color: #758399; }
+    button#toggle-link-widths:hover { background-color: var(--excel-blue-dark); }
 
     /* --- КОНТЕЙНЕР --- */
     #output {
@@ -107,7 +120,7 @@
     .pvtTable {
       font-size: 13px;
       border-collapse: collapse;
-      border: 1px solid #ddd;
+      border: 1px solid var(--excel-border);
       font-family: inherit;
       table-layout: fixed;
       width: max-content;
@@ -116,7 +129,7 @@
     }
 
     .pvtTable th, .pvtTable td {
-      border: 1px solid #ccc;
+      border: 1px solid var(--excel-border);
       padding: 5px 8px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -129,7 +142,8 @@
     }
 
     .pvtTable th {
-      background-color: #f2f2f2;
+      background-color: var(--excel-blue-light);
+      color: var(--excel-text);
       font-weight: 600;
     }
 
@@ -145,7 +159,7 @@
       height: 100%;
     }
 
-    .resizer-col:hover { border-right: 2px solid #169366; }
+    .resizer-col:hover { border-right: 2px solid var(--excel-green); }
 
     .resizer-row {
       position: absolute;
@@ -158,7 +172,7 @@
       user-select: none;
     }
 
-    .resizer-row:hover { border-bottom: 2px solid #169366; }
+    .resizer-row:hover { border-bottom: 2px solid var(--excel-green); }
 
     /* --- CLEAN MODE --- */
     .clean-mode .pvtAxisContainer,
@@ -212,7 +226,7 @@
     }
 
     .derivedTable th.metric-label {
-      background: #93a7c7;
+      background: var(--excel-blue-dark);
       color: #fff;
       font-weight: 700;
       text-align: left;
@@ -220,14 +234,14 @@
     }
 
     .derivedTable th.metric-header-corner {
-      background: #93a7c7;
+      background: var(--excel-blue-dark);
       color: #fff;
       font-weight: 700;
       text-align: center;
     }
 
     .derivedTable th.metric-col-header {
-      background: #f2f2f2;
+      background: var(--excel-blue-light);
       color: #222;
       font-weight: 700;
       text-align: center;
@@ -296,7 +310,7 @@
     }
 
     .metric-target-input:focus {
-      border-color: #169366;
+      border-color: var(--excel-green);
       box-shadow: 0 0 0 2px rgba(22,147,102,0.15);
     }
 
@@ -327,10 +341,10 @@
       justify-content: center;
       width: 20px;
       height: 20px;
-      border: 1px solid #c9d3e2;
+      border: 1px solid var(--excel-border);
       border-radius: 4px;
       background: #fff;
-      color: #556987;
+      color: var(--excel-blue-dark);
       cursor: pointer;
       font-size: 11px;
       line-height: 1;
@@ -339,13 +353,13 @@
     }
 
     .pivot-drill-btn:hover {
-      background: #eef4fb;
-      border-color: #9fb4d3;
-      color: #304e7a;
+      background: var(--excel-surface-alt);
+      border-color: var(--excel-blue);
+      color: var(--excel-blue-dark);
     }
 
     .pivot-drill-btn:active {
-      background: #e2edf9;
+      background: var(--excel-blue-light);
     }
 
     /* --- ЭКРАН ДЕТАЛИЗАЦИИ НЕДЕЛИ --- */
@@ -364,8 +378,8 @@
 
     #detail-back-btn {
       background: #fff;
-      color: #304e7a;
-      border: 1px solid #c9d3e2;
+      color: var(--excel-blue-dark);
+      border: 1px solid var(--excel-border);
       border-radius: 6px;
       padding: 7px 12px;
       cursor: pointer;
@@ -374,19 +388,19 @@
     }
 
     #detail-back-btn:hover {
-      background: #eef4fb;
-      border-color: #9fb4d3;
+      background: var(--excel-surface-alt);
+      border-color: var(--excel-blue);
     }
 
     #detail-title {
       font-size: 14px;
       font-weight: 700;
-      color: #30425e;
+      color: var(--excel-blue-dark);
     }
 
     #detail-subtitle {
       font-size: 12px;
-      color: #6a7891;
+      color: #5f6f89;
     }
 
     .detail-title-wrap {
@@ -397,8 +411,47 @@
 
     .detail-empty-msg {
       margin-top: 12px;
-      color: #6a7891;
+      color: #5f6f89;
       font-size: 13px;
+    }
+
+    #detail-view-root.detail-mode .pvtTable th,
+    #detail-view-root.detail-mode .pvtTable th.pvtAxisLabel,
+    #detail-view-root.detail-mode .pvtTable th.pvtRowLabel,
+    #detail-view-root.detail-mode .pvtTable th.pvtColLabel,
+    #detail-view-root.detail-mode .pvtTable th.pvtTotalLabel {
+      background: var(--excel-blue-dark);
+      color: #fff;
+    }
+
+    #detail-view-root.detail-mode .pvtTable td {
+      background: var(--excel-surface);
+    }
+
+    #detail-view-root.detail-mode .derivedTable th.metric-label,
+    #detail-view-root.detail-mode .derivedTable th.metric-header-corner {
+      background: var(--excel-green);
+      color: #fff;
+    }
+
+    #detail-view-root.detail-mode .derivedTable th.metric-col-header {
+      background: var(--excel-blue);
+      color: #fff;
+    }
+
+    #detail-view-root.detail-mode .metric-target-box {
+      background: rgba(255,255,255,0.18);
+    }
+
+    #detail-view-root.detail-mode #detail-back-btn {
+      background: var(--excel-blue-dark);
+      color: #fff;
+      border-color: var(--excel-blue-dark);
+    }
+
+    #detail-view-root.detail-mode #detail-back-btn:hover {
+      background: var(--excel-blue);
+      border-color: var(--excel-blue);
     }
   </style>
 
@@ -1299,6 +1352,42 @@
       }
     }
 
+    function getFirstColumnWidth(table) {
+      const widths = getTableColumnWidths(table);
+      const width = widths[0];
+      return (Number.isFinite(width) && width > 20) ? width : null;
+    }
+
+    function applyFirstColumnWidth(table, width) {
+      if (!table || !Number.isFinite(width) || width <= 20) return;
+
+      const rows = Array.from(table.querySelectorAll('tr'));
+      rows.forEach(tr => {
+        const cell = tr.children[0];
+        if (!cell) return;
+        cell.style.width = `${width}px`;
+        cell.style.minWidth = `${width}px`;
+        cell.style.maxWidth = `${width}px`;
+      });
+    }
+
+    function getLinkedLabelWidth(fallbackWidth) {
+      const currentDerivedWidth = getFirstColumnWidth(getDerivedPivotTable());
+      if (Number.isFinite(currentDerivedWidth) && currentDerivedWidth > 20) {
+        return currentDerivedWidth;
+      }
+
+      const savedDerivedWidth = Array.isArray(savedDerivedColumnWidths)
+        ? savedDerivedColumnWidths[0]
+        : null;
+
+      if (Number.isFinite(savedDerivedWidth) && savedDerivedWidth > 20) {
+        return savedDerivedWidth;
+      }
+
+      return fallbackWidth;
+    }
+
     function captureAndSaveColumnWidths() {
       const table = getMainPivotTable();
       if (!table) return;
@@ -1561,7 +1650,10 @@
       if (!firstMetricRow) return;
 
       const expectedCols = firstMetricRow.querySelectorAll('td.metric-val').length;
-      const { labelWidth, dataWidths } = getMainTableLayoutHints(expectedCols);
+      const { labelWidth: mainLabelWidth, dataWidths } = getMainTableLayoutHints(expectedCols);
+      const labelWidth = linkColumns
+        ? getLinkedLabelWidth(mainLabelWidth)
+        : mainLabelWidth;
 
       derivedTable.querySelectorAll('th.metric-header-corner, th.metric-label').forEach(th => {
         th.style.width = `${labelWidth}px`;
@@ -1585,6 +1677,10 @@
         });
       });
 
+      if (linkColumns) {
+        applyFirstColumnWidth(getMainPivotTable(), labelWidth);
+      }
+
       restoreSavedDerivedSizes({ columns: !linkColumns, rows: true });
     }
 
@@ -1600,7 +1696,11 @@
       if (!result) return;
 
       const { metrics, colCount, colLabels } = result;
-      const { labelWidth, dataWidths } = getMainTableLayoutHints(colCount);
+      const layoutHints = getMainTableLayoutHints(colCount);
+      const dataWidths = layoutHints.dataWidths;
+      const labelWidth = areTablesWidthLinked
+        ? getLinkedLabelWidth(layoutHints.labelWidth)
+        : layoutHints.labelWidth;
 
       const wrap = document.createElement('div');
       wrap.id = 'secondary-table-wrap';
@@ -2008,6 +2108,7 @@
 
       const root = document.createElement('div');
       root.id = 'detail-view-root';
+      root.classList.add('detail-mode');
 
       const backbar = document.createElement('div');
       backbar.id = 'detail-backbar';
@@ -2245,6 +2346,12 @@
             applyColumnWidthsToTable(derivedTable, nextDerivedWidths);
           } else if (areTablesWidthLinked) {
             syncSecondaryTableWidthsFromMain({ linkColumns: true });
+          }
+
+          if (areTablesWidthLinked && initialDerivedWidths.length) {
+            const linkedFirstWidth = Math.max(30, initialDerivedWidths[0] + dx);
+            applyFirstColumnWidth(mainTable, linkedFirstWidth);
+            applyFirstColumnWidth(derivedTable, linkedFirstWidth);
           }
         };
 
