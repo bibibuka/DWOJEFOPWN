@@ -81,6 +81,19 @@
 
     button#toggle-mode:hover { background-color: #127a55; }
 
+    button#toggle-link-widths {
+      background-color: #8b98ab;
+      color: white;
+      border: none;
+      padding: 6px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    button#toggle-link-widths:hover { background-color: #758399; }
+
     /* --- КОНТЕЙНЕР --- */
     #output {
       padding: 20px;
@@ -408,6 +421,7 @@
       <span style="color:#888;">Растянуть всё:</span>
       <div class="global-drag" id="drag-all-cols" title="Зажмите и тяните вправо/влево">↔ Столбцы</div>
       <div class="global-drag" id="drag-all-rows" title="Зажмите и тяните вниз/вверх">↕ Строки</div>
+      <button id="toggle-link-widths" type="button" onclick="toggleLinkWidths()">Привязка: выкл</button>
     </div>
 
     <button id="toggle-mode" onclick="toggleMode()">Настройки</button>
@@ -425,6 +439,7 @@
     let currentTableId = null;
 
     let isViewOnly = false;
+    let areTablesWidthLinked = false;
     let currentZoom = 1;
 
     let renderInProgress = false;
@@ -596,6 +611,11 @@
       return result;
     }
 
+    function normalizeLinkedWidthsFlag(savedValue) {
+      if (savedValue === undefined || savedValue === null) return false;
+      return !!savedValue;
+    }
+
     function getMetricTarget(metricKey) {
       const val = currentMetricTargets?.[metricKey];
       if (Number.isFinite(val) && val >= 0) return val;
@@ -636,6 +656,19 @@
       }
     }
 
+    async function saveLinkedWidthsMode() {
+      lsSave('linkedWidths', areTablesWidthLinked);
+
+      try {
+        const key = await getConfigKeyForCurrentTable();
+        const config = (await grist.getOption(key)) || {};
+        config.areTablesWidthLinked = areTablesWidthLinked;
+        await grist.setOption(key, config);
+      } catch (e) {
+        // локальное хранение уже сработало
+      }
+    }
+
     function recolorMetricRow(metricKey) {
       const target = getMetricTarget(metricKey);
       const wrap = document.getElementById('secondary-table-wrap');
@@ -667,6 +700,34 @@
       // чтобы фокус ввода не терялся и значение не «откатывалось».
       saveMetricTargetsToOptions();
       recolorMetricRow(metricKey);
+    }
+
+    function updateLinkWidthsButton() {
+      const btn = document.getElementById('toggle-link-widths');
+      if (!btn) return;
+
+      if (areTablesWidthLinked) {
+        btn.textContent = 'Привязка: вкл';
+        btn.style.backgroundColor = '#169366';
+        btn.title = 'Нижняя таблица держит ширины по верхней';
+      } else {
+        btn.textContent = 'Привязка: выкл';
+        btn.style.backgroundColor = '#8b98ab';
+        btn.title = 'Ширины нижней таблицы можно менять отдельно';
+      }
+    }
+
+    async function toggleLinkWidths() {
+      areTablesWidthLinked = !areTablesWidthLinked;
+      updateLinkWidthsButton();
+
+      if (areTablesWidthLinked) {
+        syncSecondaryTableWidthsFromMain({ linkColumns: true });
+      } else {
+        restoreSavedDerivedSizes();
+      }
+
+      await saveLinkedWidthsMode();
     }
 
     function normalizeLabel(v) {
@@ -1213,17 +1274,39 @@
       return bestRow;
     }
 
+    function getTableColumnWidths(table) {
+      const bestRow = getWidestTableRow(table);
+      if (!bestRow) return [];
+
+      return Array.from(bestRow.children).map(
+        c => Math.round(c.getBoundingClientRect().width / currentZoom)
+      );
+    }
+
+    function applyColumnWidthsToTable(table, widths) {
+      if (!table || !Array.isArray(widths) || !widths.length) return;
+
+      const allRows = Array.from(table.querySelectorAll('tr'));
+      for (const tr of allRows) {
+        const cells = Array.from(tr.children);
+        cells.forEach((cell, idx) => {
+          const width = widths[idx];
+          if (!Number.isFinite(width) || width <= 20) return;
+          cell.style.width = `${width}px`;
+          cell.style.minWidth = `${width}px`;
+          cell.style.maxWidth = `${width}px`;
+        });
+      }
+    }
+
     function captureAndSaveColumnWidths() {
       const table = getMainPivotTable();
       if (!table) return;
 
       // Берём самую широкую строку (по числу ячеек) — это реальная сетка.
-      const bestRow = getWidestTableRow(table);
-      if (!bestRow) return;
+      const widths = getTableColumnWidths(table);
+      if (!widths.length) return;
 
-      const widths = Array.from(bestRow.children).map(
-        c => Math.round(c.getBoundingClientRect().width / currentZoom)
-      );
       savedColumnWidths = widths;
       lsSave('columnWidths', widths);
     }
@@ -1232,12 +1315,9 @@
       const table = getDerivedPivotTable();
       if (!table) return;
 
-      const bestRow = getWidestTableRow(table);
-      if (!bestRow) return;
+      const widths = getTableColumnWidths(table);
+      if (!widths.length) return;
 
-      const widths = Array.from(bestRow.children).map(
-        c => Math.round(c.getBoundingClientRect().width / currentZoom)
-      );
       savedDerivedColumnWidths = widths;
       lsSave('derivedColumnWidths', widths);
     }
@@ -1261,11 +1341,13 @@
       lsSave('derivedRowHeights', heights);
     }
 
-    function restoreSavedDerivedSizes() {
+    function restoreSavedDerivedSizes(options = {}) {
       const table = getDerivedPivotTable();
       if (!table) return;
 
-      if (Array.isArray(savedDerivedColumnWidths) && savedDerivedColumnWidths.length) {
+      const { columns = true, rows = true } = options;
+
+      if (columns && Array.isArray(savedDerivedColumnWidths) && savedDerivedColumnWidths.length) {
         const allRows = Array.from(table.querySelectorAll('tr'));
         for (const tr of allRows) {
           const cells = Array.from(tr.children);
@@ -1280,7 +1362,7 @@
         }
       }
 
-      if (Array.isArray(savedDerivedRowHeights) && savedDerivedRowHeights.length) {
+      if (rows && Array.isArray(savedDerivedRowHeights) && savedDerivedRowHeights.length) {
         const rows = Array.from(table.querySelectorAll('tr'));
         rows.forEach((tr, idx) => {
           const h = savedDerivedRowHeights[idx];
@@ -1324,7 +1406,6 @@
       }
 
       syncSecondaryTableWidthsFromMain();
-      restoreSavedDerivedSizes();
     }
 
     function normalizeVisibleHeaderText(text) {
@@ -1467,9 +1548,11 @@
       return { labelWidth, dataWidths };
     }
 
-    function syncSecondaryTableWidthsFromMain() {
+    function syncSecondaryTableWidthsFromMain(options = {}) {
       const wrap = document.getElementById('secondary-table-wrap');
       if (!wrap) return;
+
+      const { linkColumns = areTablesWidthLinked } = options;
 
       const derivedTable = wrap.querySelector('.derivedTable');
       if (!derivedTable) return;
@@ -1502,7 +1585,7 @@
         });
       });
 
-      restoreSavedDerivedSizes();
+      restoreSavedDerivedSizes({ columns: !linkColumns, rows: true });
     }
 
     // -----------------------------
@@ -1898,6 +1981,7 @@
             inclusions: currentPivotConfig.inclusions,
             exclusions: currentPivotConfig.exclusions,
             isViewOnly: isViewOnly,
+            areTablesWidthLinked: areTablesWidthLinked,
             zoomLevel: currentZoom,
             metricTargets: currentMetricTargets
           };
@@ -2043,12 +2127,19 @@
           $('#zoom-slider').val(currentZoom);
         }
 
+        areTablesWidthLinked = normalizeLinkedWidthsFlag(savedConfig.areTablesWidthLinked);
+
         currentMetricTargets = normalizeMetricTargets(savedConfig.metricTargets);
 
         // Локальные (per-user) цели имеют приоритет над общими из grist.setOption.
         const localTargets = lsLoad('metricTargets');
         if (localTargets && typeof localTargets === 'object') {
           currentMetricTargets = normalizeMetricTargets(localTargets);
+        }
+
+        const localLinkedWidths = lsLoad('linkedWidths');
+        if (typeof localLinkedWidths === 'boolean') {
+          areTablesWidthLinked = localLinkedWidths;
         }
 
         // Восстанавливаем сохранённые пользователем размеры
@@ -2058,6 +2149,7 @@
         savedDerivedRowHeights = lsLoad('derivedRowHeights') || [];
 
         updateViewMode();
+        updateLinkWidthsButton();
 
         const myAggregators = buildAggregators(fields);
         const safeConfig = sanitizeConfig(savedConfig, fields);
@@ -2135,32 +2227,38 @@
         isUserDragging = true;
         const startX = e.clientX;
 
-        const mainTable = document.querySelector('#output .pvtRendererArea .pvtTable:not(.derivedTable)');
-        const headers = mainTable
-          ? mainTable.querySelectorAll('th')
-          : document.querySelectorAll('.pvtTable:not(.derivedTable) th');
-
-        const initialWidths = Array.from(headers).map(th => th.getBoundingClientRect().width / currentZoom);
+        const mainTable = getMainPivotTable();
+        const derivedTable = getDerivedPivotTable();
+        const initialMainWidths = getTableColumnWidths(mainTable);
+        const initialDerivedWidths = getTableColumnWidths(derivedTable);
 
         const onMouseMove = (ev) => {
           const dx = (ev.clientX - startX) / currentZoom;
 
-          headers.forEach((th, idx) => {
-            const newW = Math.max(30, initialWidths[idx] + dx);
-            th.style.width = `${newW}px`;
-            th.style.maxWidth = `${newW}px`;
-            th.style.minWidth = '30px';
-          });
+          if (initialMainWidths.length) {
+            const nextMainWidths = initialMainWidths.map(w => Math.max(30, w + dx));
+            applyColumnWidthsToTable(mainTable, nextMainWidths);
+          }
 
-          syncSecondaryTableWidthsFromMain();
+          if (initialDerivedWidths.length) {
+            const nextDerivedWidths = initialDerivedWidths.map(w => Math.max(30, w + dx));
+            applyColumnWidthsToTable(derivedTable, nextDerivedWidths);
+          } else if (areTablesWidthLinked) {
+            syncSecondaryTableWidthsFromMain({ linkColumns: true });
+          }
         };
 
         const onMouseUp = () => {
           document.removeEventListener('mousemove', onMouseMove);
           document.removeEventListener('mouseup', onMouseUp);
           document.body.style.cursor = '';
-          syncSecondaryTableWidthsFromMain();
           captureAndSaveColumnWidths();
+          captureAndSaveDerivedColumnWidths();
+
+          if (areTablesWidthLinked) {
+            syncSecondaryTableWidthsFromMain({ linkColumns: true });
+          }
+
           isUserDragging = false;
           flushPendingAfterInteraction();
         };
@@ -2191,6 +2289,7 @@
           document.removeEventListener('mouseup', onMouseUp);
           document.body.style.cursor = '';
           captureAndSaveRowHeights();
+          captureAndSaveDerivedRowHeights();
           isUserDragging = false;
           flushPendingAfterInteraction();
         };
@@ -2291,7 +2390,11 @@
           syncSecondaryTableWidthsFromMain();
           captureAndSaveColumnWidths();
         } else {
-          captureAndSaveDerivedColumnWidths();
+          if (areTablesWidthLinked) {
+            syncSecondaryTableWidthsFromMain({ linkColumns: true });
+          } else {
+            captureAndSaveDerivedColumnWidths();
+          }
         }
         isUserDragging = false;
         flushPendingAfterInteraction();
