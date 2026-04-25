@@ -235,16 +235,16 @@
     }
 
     .metric-label-inner {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
       gap: 10px;
-      width: 100%;
+      max-width: 100%;
       min-width: 0;
     }
 
     .metric-label-text {
-      flex: 1 1 auto;
+      flex: 0 1 auto;
+      max-width: 100%;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -447,6 +447,8 @@
     // Сохранённые пользователем размеры (per tableId)
     let savedColumnWidths = [];          // массив ширин по индексу колонки
     let savedRowHeights = [];            // массив высот по индексу строки
+    let savedDerivedColumnWidths = [];   // массив ширин KPI-таблицы по индексу колонки
+    let savedDerivedRowHeights = [];     // массив высот KPI-таблицы по индексу строки
 
     let currentPivotConfig = {
       rows: [],
@@ -1194,21 +1196,50 @@
       return area.querySelector('.pvtTable:not(.derivedTable)');
     }
 
-    function captureAndSaveColumnWidths() {
-      const table = getMainPivotTable();
-      if (!table) return;
-      // Берём самую широкую строку (по числу ячеек) — это реальная сетка.
+    function getDerivedPivotTable() {
+      return document.querySelector('#secondary-table-wrap .derivedTable');
+    }
+
+    function getWidestTableRow(table) {
+      if (!table) return null;
+
       const allRows = Array.from(table.querySelectorAll('tr'));
       let bestRow = null;
+
       for (const tr of allRows) {
         if (!bestRow || tr.children.length > bestRow.children.length) bestRow = tr;
       }
+
+      return bestRow;
+    }
+
+    function captureAndSaveColumnWidths() {
+      const table = getMainPivotTable();
+      if (!table) return;
+
+      // Берём самую широкую строку (по числу ячеек) — это реальная сетка.
+      const bestRow = getWidestTableRow(table);
       if (!bestRow) return;
+
       const widths = Array.from(bestRow.children).map(
         c => Math.round(c.getBoundingClientRect().width / currentZoom)
       );
       savedColumnWidths = widths;
       lsSave('columnWidths', widths);
+    }
+
+    function captureAndSaveDerivedColumnWidths() {
+      const table = getDerivedPivotTable();
+      if (!table) return;
+
+      const bestRow = getWidestTableRow(table);
+      if (!bestRow) return;
+
+      const widths = Array.from(bestRow.children).map(
+        c => Math.round(c.getBoundingClientRect().width / currentZoom)
+      );
+      savedDerivedColumnWidths = widths;
+      lsSave('derivedColumnWidths', widths);
     }
 
     function captureAndSaveRowHeights() {
@@ -1218,6 +1249,47 @@
       const heights = rows.map(tr => Math.round(tr.getBoundingClientRect().height / currentZoom));
       savedRowHeights = heights;
       lsSave('rowHeights', heights);
+    }
+
+    function captureAndSaveDerivedRowHeights() {
+      const table = getDerivedPivotTable();
+      if (!table) return;
+
+      const rows = Array.from(table.querySelectorAll('tr'));
+      const heights = rows.map(tr => Math.round(tr.getBoundingClientRect().height / currentZoom));
+      savedDerivedRowHeights = heights;
+      lsSave('derivedRowHeights', heights);
+    }
+
+    function restoreSavedDerivedSizes() {
+      const table = getDerivedPivotTable();
+      if (!table) return;
+
+      if (Array.isArray(savedDerivedColumnWidths) && savedDerivedColumnWidths.length) {
+        const allRows = Array.from(table.querySelectorAll('tr'));
+        for (const tr of allRows) {
+          const cells = Array.from(tr.children);
+          cells.forEach((c, idx) => {
+            const w = savedDerivedColumnWidths[idx];
+            if (Number.isFinite(w) && w > 20) {
+              c.style.width = `${w}px`;
+              c.style.minWidth = `${w}px`;
+              c.style.maxWidth = `${w}px`;
+            }
+          });
+        }
+      }
+
+      if (Array.isArray(savedDerivedRowHeights) && savedDerivedRowHeights.length) {
+        const rows = Array.from(table.querySelectorAll('tr'));
+        rows.forEach((tr, idx) => {
+          const h = savedDerivedRowHeights[idx];
+          if (Number.isFinite(h) && h > 16) {
+            tr.style.height = `${h}px`;
+            Array.from(tr.children).forEach(c => c.style.height = `${h}px`);
+          }
+        });
+      }
     }
 
     function restoreSavedSizes() {
@@ -1252,6 +1324,7 @@
       }
 
       syncSecondaryTableWidthsFromMain();
+      restoreSavedDerivedSizes();
     }
 
     function normalizeVisibleHeaderText(text) {
@@ -1428,6 +1501,8 @@
           td.style.maxWidth = `${w}px`;
         });
       });
+
+      restoreSavedDerivedSizes();
     }
 
     // -----------------------------
@@ -1979,6 +2054,8 @@
         // Восстанавливаем сохранённые пользователем размеры
         savedColumnWidths = lsLoad('columnWidths') || [];
         savedRowHeights = lsLoad('rowHeights') || [];
+        savedDerivedColumnWidths = lsLoad('derivedColumnWidths') || [];
+        savedDerivedRowHeights = lsLoad('derivedRowHeights') || [];
 
         updateViewMode();
 
@@ -2212,8 +2289,10 @@
 
         if (!isDerived) {
           syncSecondaryTableWidthsFromMain();
+          captureAndSaveColumnWidths();
+        } else {
+          captureAndSaveDerivedColumnWidths();
         }
-        captureAndSaveColumnWidths();
         isUserDragging = false;
         flushPendingAfterInteraction();
       };
@@ -2224,12 +2303,16 @@
     function setupRowResizer(cell, resizer) {
       let startY = 0, startH = 0;
       const row = cell.parentElement;
+      let isDerived = false;
 
       const onMouseDown = (e) => {
         e.stopPropagation();
         isUserDragging = true;
         startY = e.clientY;
         startH = row.getBoundingClientRect().height / currentZoom;
+
+        const table = cell.closest('table');
+        isDerived = !!(table && table.classList.contains('derivedTable'));
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
@@ -2251,7 +2334,11 @@
         resizer.style.borderBottom = '';
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-        captureAndSaveRowHeights();
+        if (isDerived) {
+          captureAndSaveDerivedRowHeights();
+        } else {
+          captureAndSaveRowHeights();
+        }
         isUserDragging = false;
         flushPendingAfterInteraction();
       };
