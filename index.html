@@ -432,6 +432,7 @@
 
     let reloadInFlight = false;
     let lastDataStamp = 0;
+    let lastRenderedDataHash = null;   // хэш равных данных, чтобы не ререндерить «попусту»
 
     let currentMetricTargets = {};
     let currentDerivedResult = null;
@@ -547,6 +548,27 @@
       const ae = document.activeElement;
       if (ae && ae.classList && ae.classList.contains('metric-target-input')) return true;
       return false;
+    }
+
+    // Дешёвый хэш для сравнения сырых записей: стабильный пока таблица не меняется.
+    function computeRecordsHash(records) {
+      if (!Array.isArray(records) || !records.length) return 'empty';
+      let h = records.length + ':';
+      try { h += Object.keys(records[0]).length + ':'; } catch (e) {}
+      const step = Math.max(1, Math.floor(records.length / 25));
+      for (let i = 0; i < records.length; i += step) {
+        const r = records[i];
+        if (!r) continue;
+        try {
+          const keys = Object.keys(r);
+          for (let k = 0; k < keys.length; k++) {
+            const v = r[keys[k]];
+            h += (v == null ? '' : String(v).slice(0, 12)) + '|';
+          }
+          h += ';';
+        } catch (e) { h += '?;'; }
+      }
+      return h;
     }
 
     function sanitizeConfig(savedConfig, fields) {
@@ -1175,10 +1197,16 @@
     function captureAndSaveColumnWidths() {
       const table = getMainPivotTable();
       if (!table) return;
-      const headRow = table.querySelector('thead tr:last-child');
-      if (!headRow) return;
-      const cells = Array.from(headRow.children);
-      const widths = cells.map(th => Math.round(th.getBoundingClientRect().width / currentZoom));
+      // Берём самую широкую строку (по числу ячеек) — это реальная сетка.
+      const allRows = Array.from(table.querySelectorAll('tr'));
+      let bestRow = null;
+      for (const tr of allRows) {
+        if (!bestRow || tr.children.length > bestRow.children.length) bestRow = tr;
+      }
+      if (!bestRow) return;
+      const widths = Array.from(bestRow.children).map(
+        c => Math.round(c.getBoundingClientRect().width / currentZoom)
+      );
       savedColumnWidths = widths;
       lsSave('columnWidths', widths);
     }
@@ -1196,23 +1224,22 @@
       const table = getMainPivotTable();
       if (!table) return;
 
-      // Восстановление ширин — по индексу ячеек в последнем ряду заголовка
+      // Ширины: применяем к самой широкой строке и ко всем ячейкам с тем же индексом в других строках.
       if (Array.isArray(savedColumnWidths) && savedColumnWidths.length) {
-        const headRow = table.querySelector('thead tr:last-child');
-        if (headRow) {
-          const cells = Array.from(headRow.children);
-          cells.forEach((th, idx) => {
+        const allRows = Array.from(table.querySelectorAll('tr'));
+        for (const tr of allRows) {
+          const cells = Array.from(tr.children);
+          cells.forEach((c, idx) => {
             const w = savedColumnWidths[idx];
             if (Number.isFinite(w) && w > 20) {
-              th.style.width = `${w}px`;
-              th.style.minWidth = `${w}px`;
-              th.style.maxWidth = `${w}px`;
+              c.style.width = `${w}px`;
+              c.style.minWidth = `${w}px`;
+              c.style.maxWidth = `${w}px`;
             }
           });
         }
       }
 
-      // Восстановление высот по индексу строк
       if (Array.isArray(savedRowHeights) && savedRowHeights.length) {
         const rows = Array.from(table.querySelectorAll('tr'));
         rows.forEach((tr, idx) => {
@@ -1632,7 +1659,13 @@
       reloadInFlight = true;
       try {
         const rows = await grist.fetchSelectedTable({ format: "rows", includeColumns: "normal" });
-        rawRecords = rows || [];
+        const incoming = rows || [];
+        const newHash = computeRecordsHash(incoming);
+        if (newHash === lastRenderedDataHash && rawRecords && rawRecords.length === incoming.length) {
+          rawRecords = incoming;
+          return; // ничего не меняем — сохраняем ручную подобранные размеры
+        }
+        rawRecords = incoming;
         lastDataStamp = Date.now();
         scheduleRender();
       } catch (e) {
@@ -1801,6 +1834,8 @@
       };
 
       $("#output").empty().pivotUI(currentRecords, options, true);
+      // Применяем сохранённые размеры сразу (без видимого скачка), а потом ещё раз после дорисовки.
+      restoreSavedSizes();
       setTimeout(() => postRenderEnhanceMain(), 200);
     }
 
@@ -1971,6 +2006,8 @@
           renderMainView(currentRecords, key, myAggregators);
         }
 
+        lastRenderedDataHash = computeRecordsHash(rawRecords);
+
       } catch (e) {
         console.error(e);
         $('#output').text("Ошибка рендера: " + (e?.message || e));
@@ -1989,7 +2026,18 @@
     grist.onRecords(function(records) {
       // Если пользователь сейчас тянет форму таблицы или печатает цель —
       // откладываем входящие данные, чтобы не рвать рисунок.
-      rawRecords = records || [];
+      const incoming = records || [];
+
+      // Если данные реально не изменились — не ререндерим.
+      // Это ключевое: Grist присылает «тики» часто, и раньше это сбрасывало
+      // вручную подобранные размеры.
+      const newHash = computeRecordsHash(incoming);
+      if (newHash === lastRenderedDataHash && rawRecords && rawRecords.length === incoming.length) {
+        rawRecords = incoming;
+        return;
+      }
+
+      rawRecords = incoming;
       lastDataStamp = Date.now();
       if (isInteractingNow()) {
         pendingScheduleRender = true;
