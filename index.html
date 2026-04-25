@@ -438,6 +438,15 @@
 
     let currentDrilldown = null;
 
+    // Флаги для подавления лишних ререндеров пока пользователь взаимодействует с UI
+    let isUserDragging = false;          // тянет колонку/строку
+    let pendingScheduleRender = false;   // отложенный ререндер
+    let pendingDataReload = false;       // отложенная перезагрузка данных из Grist
+
+    // Сохранённые пользователем размеры (per tableId)
+    let savedColumnWidths = [];          // массив ширин по индексу колонки
+    let savedRowHeights = [];            // массив высот по индексу строки
+
     let currentPivotConfig = {
       rows: [],
       cols: [],
@@ -516,6 +525,30 @@
       return tableId ? `pivotConfig:${tableId}` : `pivotConfig`;
     }
 
+    // -----------------------------
+    // ЛОКАЛЬНОЕ ХРАНИЛИЩЕ (per-user, per-browser)
+    // -----------------------------
+    function lsKey(suffix) {
+      const tid = currentTableId || 'default';
+      return `pivotUI::${tid}::${suffix}`;
+    }
+    function lsSave(suffix, value) {
+      try { localStorage.setItem(lsKey(suffix), JSON.stringify(value)); } catch (e) {}
+    }
+    function lsLoad(suffix) {
+      try {
+        const raw = localStorage.getItem(lsKey(suffix));
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+
+    function isInteractingNow() {
+      if (isUserDragging) return true;
+      const ae = document.activeElement;
+      if (ae && ae.classList && ae.classList.contains('metric-target-input')) return true;
+      return false;
+    }
+
     function sanitizeConfig(savedConfig, fields) {
       const cleanArr = (a) => (Array.isArray(a) ? a.filter(x => fields.includes(x)) : []);
       return {
@@ -564,10 +597,37 @@
     }
 
     async function saveMetricTargetsToOptions() {
-      const key = await getConfigKeyForCurrentTable();
-      const config = (await grist.getOption(key)) || {};
-      config.metricTargets = currentMetricTargets;
-      await grist.setOption(key, config);
+      // 1) Локально (per-user / per-browser) — основное место хранения целей
+      lsSave('metricTargets', currentMetricTargets);
+
+      // 2) Резервно — пишем и в общий конфиг документа,
+      //    чтобы новые пользователи видели разумные значения по умолчанию.
+      try {
+        const key = await getConfigKeyForCurrentTable();
+        const config = (await grist.getOption(key)) || {};
+        config.metricTargets = currentMetricTargets;
+        await grist.setOption(key, config);
+      } catch (e) {
+        // не критично — локальное хранение уже сработало
+      }
+    }
+
+    function recolorMetricRow(metricKey) {
+      const target = getMetricTarget(metricKey);
+      const wrap = document.getElementById('secondary-table-wrap');
+      if (!wrap) return;
+      const row = wrap.querySelector(`tr[data-metric-key="${metricKey}"]`);
+      if (!row) return;
+
+      row.querySelectorAll('td.metric-val').forEach(td => {
+        if (td.classList.contains('metric-na')) return;
+        const txt = (td.textContent || '').replace(/\s+/g, '').replace('%', '').replace(',', '.');
+        const num = parseFloat(txt);
+        if (Number.isFinite(num)) {
+          td.style.backgroundColor = getHeatColorByTarget(num / 100, target);
+          td.style.color = '#fff';
+        }
+      });
     }
 
     async function handleMetricTargetCommit(metricKey, inputEl) {
@@ -579,8 +639,10 @@
 
       inputEl.value = formatTargetInputValue(currentMetricTargets[metricKey]);
 
-      await saveMetricTargetsToOptions();
-      scheduleRender();
+      // Сохраняем синхронно локально, асинхронно в Grist — без полного ререндера,
+      // чтобы фокус ввода не терялся и значение не «откатывалось».
+      saveMetricTargetsToOptions();
+      recolorMetricRow(metricKey);
     }
 
     function normalizeLabel(v) {
@@ -677,11 +739,30 @@
     }
 
     function scheduleRender() {
+      // Пока пользователь тянет колонку/строку или печатает в поле цели —
+      // откладываем ререндер, иначе форма таблицы «слетает» и ввод теряется.
+      if (isInteractingNow()) {
+        pendingScheduleRender = true;
+        return;
+      }
       if (renderInProgress) {
         renderPending = true;
         return;
       }
       renderPivot();
+    }
+
+    function flushPendingAfterInteraction() {
+      if (isInteractingNow()) return;
+      if (pendingDataReload) {
+        pendingDataReload = false;
+        forceReloadFromGrist('flush_after_interaction');
+        return;
+      }
+      if (pendingScheduleRender) {
+        pendingScheduleRender = false;
+        scheduleRender();
+      }
     }
 
     function findFieldByAliases(fields, aliases) {
@@ -1082,6 +1163,70 @@
       return document.querySelector('#output .pvtRendererArea');
     }
 
+    // -----------------------------
+    // СОХРАНЕНИЕ / ВОССТАНОВЛЕНИЕ РУЧНЫХ РАЗМЕРОВ
+    // -----------------------------
+    function getMainPivotTable() {
+      const area = getMainRendererArea();
+      if (!area) return null;
+      return area.querySelector('.pvtTable:not(.derivedTable)');
+    }
+
+    function captureAndSaveColumnWidths() {
+      const table = getMainPivotTable();
+      if (!table) return;
+      const headRow = table.querySelector('thead tr:last-child');
+      if (!headRow) return;
+      const cells = Array.from(headRow.children);
+      const widths = cells.map(th => Math.round(th.getBoundingClientRect().width / currentZoom));
+      savedColumnWidths = widths;
+      lsSave('columnWidths', widths);
+    }
+
+    function captureAndSaveRowHeights() {
+      const table = getMainPivotTable();
+      if (!table) return;
+      const rows = Array.from(table.querySelectorAll('tr'));
+      const heights = rows.map(tr => Math.round(tr.getBoundingClientRect().height / currentZoom));
+      savedRowHeights = heights;
+      lsSave('rowHeights', heights);
+    }
+
+    function restoreSavedSizes() {
+      const table = getMainPivotTable();
+      if (!table) return;
+
+      // Восстановление ширин — по индексу ячеек в последнем ряду заголовка
+      if (Array.isArray(savedColumnWidths) && savedColumnWidths.length) {
+        const headRow = table.querySelector('thead tr:last-child');
+        if (headRow) {
+          const cells = Array.from(headRow.children);
+          cells.forEach((th, idx) => {
+            const w = savedColumnWidths[idx];
+            if (Number.isFinite(w) && w > 20) {
+              th.style.width = `${w}px`;
+              th.style.minWidth = `${w}px`;
+              th.style.maxWidth = `${w}px`;
+            }
+          });
+        }
+      }
+
+      // Восстановление высот по индексу строк
+      if (Array.isArray(savedRowHeights) && savedRowHeights.length) {
+        const rows = Array.from(table.querySelectorAll('tr'));
+        rows.forEach((tr, idx) => {
+          const h = savedRowHeights[idx];
+          if (Number.isFinite(h) && h > 16) {
+            tr.style.height = `${h}px`;
+            Array.from(tr.children).forEach(c => c.style.height = `${h}px`);
+          }
+        });
+      }
+
+      syncSecondaryTableWidthsFromMain();
+    }
+
     function normalizeVisibleHeaderText(text) {
       return String(text ?? '')
         .replace(/[↗▾]/g, '')
@@ -1309,6 +1454,7 @@
 
       metrics.forEach(metric => {
         const tr = document.createElement('tr');
+        tr.setAttribute('data-metric-key', metric.key);
         const target = getMetricTarget(metric.key);
 
         const th = document.createElement('th');
@@ -1478,6 +1624,11 @@
     // -----------------------------
     async function forceReloadFromGrist(reason = "") {
       if (reloadInFlight) return;
+      // Не дёргаем UI, пока пользователь взаимодействует — иначе размеры/ввод «слетают».
+      if (isInteractingNow()) {
+        pendingDataReload = true;
+        return;
+      }
       reloadInFlight = true;
       try {
         const rows = await grist.fetchSelectedTable({ format: "rows", includeColumns: "normal" });
@@ -1591,6 +1742,7 @@
       syncSecondaryTableWidthsFromMain();
       injectDrillButtonsIntoMainPivotHeaders();
       initIndividualResizing();
+      restoreSavedSizes();
       applyZoom();
     }
 
@@ -1782,6 +1934,17 @@
         }
 
         currentMetricTargets = normalizeMetricTargets(savedConfig.metricTargets);
+
+        // Локальные (per-user) цели имеют приоритет над общими из grist.setOption.
+        const localTargets = lsLoad('metricTargets');
+        if (localTargets && typeof localTargets === 'object') {
+          currentMetricTargets = normalizeMetricTargets(localTargets);
+        }
+
+        // Восстанавливаем сохранённые пользователем размеры
+        savedColumnWidths = lsLoad('columnWidths') || [];
+        savedRowHeights = lsLoad('rowHeights') || [];
+
         updateViewMode();
 
         const myAggregators = buildAggregators(fields);
@@ -1824,8 +1987,14 @@
     // GRIST
     // -----------------------------
     grist.onRecords(function(records) {
+      // Если пользователь сейчас тянет форму таблицы или печатает цель —
+      // откладываем входящие данные, чтобы не рвать рисунок.
       rawRecords = records || [];
       lastDataStamp = Date.now();
+      if (isInteractingNow()) {
+        pendingScheduleRender = true;
+        return;
+      }
       scheduleRender();
     }, { format: "rows", includeColumns: "normal" });
 
@@ -1838,6 +2007,7 @@
 
       dragCols.addEventListener('mousedown', (e) => {
         e.preventDefault();
+        isUserDragging = true;
         const startX = e.clientX;
 
         const mainTable = document.querySelector('#output .pvtRendererArea .pvtTable:not(.derivedTable)');
@@ -1865,6 +2035,9 @@
           document.removeEventListener('mouseup', onMouseUp);
           document.body.style.cursor = '';
           syncSecondaryTableWidthsFromMain();
+          captureAndSaveColumnWidths();
+          isUserDragging = false;
+          flushPendingAfterInteraction();
         };
 
         document.addEventListener('mousemove', onMouseMove);
@@ -1874,6 +2047,7 @@
 
       dragRows.addEventListener('mousedown', (e) => {
         e.preventDefault();
+        isUserDragging = true;
         const startY = e.clientY;
         const rows = document.querySelectorAll('.pvtTable tr');
         const initialHeights = Array.from(rows).map(tr => tr.getBoundingClientRect().height / currentZoom);
@@ -1891,6 +2065,9 @@
           document.removeEventListener('mousemove', onMouseMove);
           document.removeEventListener('mouseup', onMouseUp);
           document.body.style.cursor = '';
+          captureAndSaveRowHeights();
+          isUserDragging = false;
+          flushPendingAfterInteraction();
         };
 
         document.addEventListener('mousemove', onMouseMove);
@@ -1940,6 +2117,7 @@
 
       const onMouseDown = (e) => {
         e.stopPropagation();
+        isUserDragging = true;
         startX = e.clientX;
         startW = cell.getBoundingClientRect().width / currentZoom;
 
@@ -1987,6 +2165,9 @@
         if (!isDerived) {
           syncSecondaryTableWidthsFromMain();
         }
+        captureAndSaveColumnWidths();
+        isUserDragging = false;
+        flushPendingAfterInteraction();
       };
 
       resizer.addEventListener('mousedown', onMouseDown);
@@ -1998,6 +2179,7 @@
 
       const onMouseDown = (e) => {
         e.stopPropagation();
+        isUserDragging = true;
         startY = e.clientY;
         startH = row.getBoundingClientRect().height / currentZoom;
 
@@ -2021,6 +2203,9 @@
         resizer.style.borderBottom = '';
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
+        captureAndSaveRowHeights();
+        isUserDragging = false;
+        flushPendingAfterInteraction();
       };
 
       resizer.addEventListener('mousedown', onMouseDown);
