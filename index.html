@@ -2571,15 +2571,24 @@
     function setupColResizer(cell, resizer) {
       let startX = 0, startW = 0;
       let isDerived = false;
+      let isMainLeftBlockCell = false;
 
       const onMouseDown = (e) => {
         e.stopPropagation();
         isUserDragging = true;
         startX = e.clientX;
-        startW = cell.getBoundingClientRect().width / currentZoom;
 
         const table = cell.closest('table');
         isDerived = !!(table && table.classList.contains('derivedTable'));
+        isMainLeftBlockCell = !!(
+          table &&
+          !isDerived &&
+          getMainLeftBlockCells(cell.parentElement).includes(cell)
+        );
+
+        startW = isMainLeftBlockCell
+          ? (getMainLeftBlockWidth(table) || (cell.getBoundingClientRect().width / currentZoom))
+          : (cell.getBoundingClientRect().width / currentZoom);
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
@@ -2604,6 +2613,9 @@
             targetCell.style.maxWidth = `${newW}px`;
             targetCell.style.minWidth = '30px';
           });
+        } else if (isMainLeftBlockCell && table) {
+          applyMainLeftBlockWidth(table, newW);
+          syncSecondaryTableWidthsFromMain({ linkColumns: areTablesWidthLinked });
         } else {
           cell.style.width = `${newW}px`;
           cell.style.maxWidth = `${newW}px`;
