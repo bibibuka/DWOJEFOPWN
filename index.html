@@ -1358,6 +1358,44 @@
       return (Number.isFinite(width) && width > 20) ? width : null;
     }
 
+    function getMainLeftBlockCells(row) {
+      if (!row) return [];
+
+      const cells = Array.from(row.children);
+      const leftCells = [];
+
+      for (const cell of cells) {
+        if (cell.tagName === 'TD') break;
+        if (cell.classList?.contains('pvtColLabel')) break;
+        leftCells.push(cell);
+      }
+
+      return leftCells;
+    }
+
+    function getMainLeftBlockWidth(table) {
+      if (!table) return null;
+
+      const rows = Array.from(table.querySelectorAll('thead tr, tbody tr'));
+      let maxWidth = null;
+
+      rows.forEach(row => {
+        const cells = getMainLeftBlockCells(row);
+        if (!cells.length) return;
+
+        const totalWidth = cells.reduce(
+          (sum, cell) => sum + (cell.getBoundingClientRect().width / currentZoom),
+          0
+        );
+
+        if (Number.isFinite(totalWidth) && totalWidth > 0) {
+          maxWidth = Math.max(maxWidth || 0, totalWidth);
+        }
+      });
+
+      return maxWidth;
+    }
+
     function applyFirstColumnWidth(table, width) {
       if (!table || !Number.isFinite(width) || width <= 20) return;
 
@@ -1368,6 +1406,41 @@
         cell.style.width = `${width}px`;
         cell.style.minWidth = `${width}px`;
         cell.style.maxWidth = `${width}px`;
+      });
+    }
+
+    function applyMainLeftBlockWidth(table, targetWidth) {
+      if (!table || !Number.isFinite(targetWidth) || targetWidth <= 20) return;
+
+      const rows = Array.from(table.querySelectorAll('thead tr, tbody tr'));
+      rows.forEach(row => {
+        const cells = getMainLeftBlockCells(row);
+        if (!cells.length) return;
+
+        const currentWidths = cells.map(cell => Math.max(30, cell.getBoundingClientRect().width / currentZoom));
+        const currentTotal = currentWidths.reduce((sum, width) => sum + width, 0);
+
+        let nextWidths;
+        if (cells.length === 1 || !Number.isFinite(currentTotal) || currentTotal <= 0) {
+          nextWidths = [targetWidth];
+        } else {
+          const scale = targetWidth / currentTotal;
+          nextWidths = currentWidths.map((width, idx) => {
+            if (idx === currentWidths.length - 1) return null;
+            return Math.max(30, Math.round(width * scale));
+          });
+
+          const assigned = nextWidths.reduce((sum, width) => sum + (width || 0), 0);
+          nextWidths[currentWidths.length - 1] = Math.max(30, targetWidth - assigned);
+        }
+
+        cells.forEach((cell, idx) => {
+          const width = nextWidths[idx];
+          if (!Number.isFinite(width) || width <= 20) return;
+          cell.style.width = `${width}px`;
+          cell.style.minWidth = `${width}px`;
+          cell.style.maxWidth = `${width}px`;
+        });
       });
     }
 
@@ -1597,15 +1670,13 @@
       const mainTable = rendererArea.querySelector('.pvtTable:not(.derivedTable)');
       if (!mainTable) return { labelWidth, dataWidths };
 
+      const mainLeftBlockWidth = getMainLeftBlockWidth(mainTable);
+      if (Number.isFinite(mainLeftBlockWidth) && mainLeftBlockWidth > 20) {
+        labelWidth = Math.max(labelWidth, mainLeftBlockWidth);
+      }
+
       const bodyRows = Array.from(mainTable.querySelectorAll('tbody tr'));
       if (!bodyRows.length) return { labelWidth, dataWidths };
-
-      for (const tr of bodyRows) {
-        const labelCell = [...tr.querySelectorAll('th')].reverse().find(th => normalizeLabel(th.textContent));
-        if (labelCell) {
-          labelWidth = Math.max(labelWidth, labelCell.getBoundingClientRect().width / currentZoom);
-        }
-      }
 
       let refTds = [];
       const totalRow = bodyRows.find(tr =>
@@ -1678,7 +1749,7 @@
       });
 
       if (linkColumns) {
-        applyFirstColumnWidth(getMainPivotTable(), labelWidth);
+        applyMainLeftBlockWidth(getMainPivotTable(), labelWidth);
       }
 
       restoreSavedDerivedSizes({ columns: !linkColumns, rows: true });
@@ -2350,7 +2421,7 @@
 
           if (areTablesWidthLinked && initialDerivedWidths.length) {
             const linkedFirstWidth = Math.max(30, initialDerivedWidths[0] + dx);
-            applyFirstColumnWidth(mainTable, linkedFirstWidth);
+            applyMainLeftBlockWidth(mainTable, linkedFirstWidth);
             applyFirstColumnWidth(derivedTable, linkedFirstWidth);
           }
         };
