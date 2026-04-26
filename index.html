@@ -1502,6 +1502,10 @@
     }
 
     function getLinkedLabelWidth(fallbackWidth) {
+      if (Number.isFinite(fallbackWidth) && fallbackWidth > 20) {
+        return fallbackWidth;
+      }
+
       const currentDerivedWidth = getFirstColumnWidth(getDerivedPivotTable());
       if (Number.isFinite(currentDerivedWidth) && currentDerivedWidth > 20) {
         return currentDerivedWidth;
