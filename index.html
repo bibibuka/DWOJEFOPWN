@@ -583,6 +583,8 @@
       firstShift:       0.05
     };
 
+    const METRIC_TARGETS_PRESET_VERSION = '2026-04-26-default-reset-1';
+
     // -----------------------------
     // HELPERS
     // -----------------------------
@@ -664,6 +666,59 @@
       return result;
     }
 
+    function getLocalMetricTargetsIfCurrentPreset() {
+      const localVersion = lsLoad('metricTargetsVersion');
+      if (localVersion !== METRIC_TARGETS_PRESET_VERSION) return null;
+
+      const localTargets = lsLoad('metricTargets');
+      if (!localTargets || typeof localTargets !== 'object') return null;
+
+      return normalizeMetricTargets(localTargets);
+    }
+
+    async function persistMetricTargetsPreset(metricTargets, existingConfig = null) {
+      const normalizedTargets = normalizeMetricTargets(metricTargets);
+      currentMetricTargets = normalizedTargets;
+
+      lsSave('metricTargets', normalizedTargets);
+      lsSave('metricTargetsVersion', METRIC_TARGETS_PRESET_VERSION);
+
+      try {
+        const key = await getConfigKeyForCurrentTable();
+        const config = existingConfig || (await grist.getOption(key)) || {};
+        config.metricTargets = normalizedTargets;
+        config.metricTargetsVersion = METRIC_TARGETS_PRESET_VERSION;
+        await grist.setOption(key, config);
+      } catch (e) {
+        // локальное хранение уже сработало
+      }
+
+      return normalizedTargets;
+    }
+
+    async function loadMetricTargetsPreset(savedConfig) {
+      const sharedVersionCurrent = savedConfig?.metricTargetsVersion === METRIC_TARGETS_PRESET_VERSION;
+      const localTargets = getLocalMetricTargetsIfCurrentPreset();
+
+      if (localTargets) {
+        currentMetricTargets = localTargets;
+
+        if (!sharedVersionCurrent) {
+          await persistMetricTargetsPreset(localTargets, savedConfig);
+        }
+        return;
+      }
+
+      if (sharedVersionCurrent) {
+        currentMetricTargets = normalizeMetricTargets(savedConfig.metricTargets);
+        lsSave('metricTargets', currentMetricTargets);
+        lsSave('metricTargetsVersion', METRIC_TARGETS_PRESET_VERSION);
+        return;
+      }
+
+      await persistMetricTargetsPreset(DEFAULT_METRIC_TARGETS, savedConfig);
+    }
+
     function normalizeLinkedWidthsFlag(savedValue) {
       if (savedValue === undefined || savedValue === null) return false;
       return !!savedValue;
@@ -696,6 +751,7 @@
     async function saveMetricTargetsToOptions() {
       // 1) Локально (per-user / per-browser) — основное место хранения целей
       lsSave('metricTargets', currentMetricTargets);
+      lsSave('metricTargetsVersion', METRIC_TARGETS_PRESET_VERSION);
 
       // 2) Резервно — пишем и в общий конфиг документа,
       //    чтобы новые пользователи видели разумные значения по умолчанию.
@@ -703,6 +759,7 @@
         const key = await getConfigKeyForCurrentTable();
         const config = (await grist.getOption(key)) || {};
         config.metricTargets = currentMetricTargets;
+        config.metricTargetsVersion = METRIC_TARGETS_PRESET_VERSION;
         await grist.setOption(key, config);
       } catch (e) {
         // не критично — локальное хранение уже сработало
@@ -2154,7 +2211,8 @@
             isViewOnly: isViewOnly,
             areTablesWidthLinked: areTablesWidthLinked,
             zoomLevel: currentZoom,
-            metricTargets: currentMetricTargets
+            metricTargets: currentMetricTargets,
+            metricTargetsVersion: METRIC_TARGETS_PRESET_VERSION
           };
 
           grist.setOption(key, configToSave);
@@ -2300,14 +2358,7 @@
         }
 
         areTablesWidthLinked = normalizeLinkedWidthsFlag(savedConfig.areTablesWidthLinked);
-
-        currentMetricTargets = normalizeMetricTargets(savedConfig.metricTargets);
-
-        // Локальные (per-user) цели имеют приоритет над общими из grist.setOption.
-        const localTargets = lsLoad('metricTargets');
-        if (localTargets && typeof localTargets === 'object') {
-          currentMetricTargets = normalizeMetricTargets(localTargets);
-        }
+        await loadMetricTargetsPreset(savedConfig);
 
         const localLinkedWidths = lsLoad('linkedWidths');
         if (typeof localLinkedWidths === 'boolean') {
