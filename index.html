@@ -2616,10 +2616,15 @@
         } else if (isMainLeftBlockCell && table) {
           applyMainLeftBlockWidth(table, newW);
           syncSecondaryTableWidthsFromMain({ linkColumns: areTablesWidthLinked });
-        } else {
-          cell.style.width = `${newW}px`;
-          cell.style.maxWidth = `${newW}px`;
-          cell.style.minWidth = '30px';
+        } else if (table) {
+          const cellIndex = cell.cellIndex;
+          table.querySelectorAll('tr').forEach(tr => {
+            const targetCell = tr.children[cellIndex];
+            if (!targetCell) return;
+            targetCell.style.width = `${newW}px`;
+            targetCell.style.maxWidth = `${newW}px`;
+            targetCell.style.minWidth = '30px';
+          });
           syncSecondaryTableWidthsFromMain();
         }
       };
